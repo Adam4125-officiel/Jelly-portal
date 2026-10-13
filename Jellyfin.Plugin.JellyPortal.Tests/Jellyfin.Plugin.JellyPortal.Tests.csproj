@@ -12,6 +12,14 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- The plugin excludes these from its runtime assets (Jellyfin supplies them); tests that build a
+         PluginConfiguration need the real assemblies next to them. Keep in step with the plugin project
+         (a test checks that the versions match the target ABI). -->
+    <PackageReference Include="Jellyfin.Model" Version="12.2.0" />
+    <PackageReference Include="Jellyfin.Controller" Version="12.2.0" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Jellyfin.Plugin.JellyPortal\Jellyfin.Plugin.JellyPortal.csproj" />
   </ItemGroup>
 

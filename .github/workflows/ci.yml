@@ -75,3 +75,5 @@ jobs:
           python-version: "3.x"
       - run: pip install pyyaml
       - run: python -m unittest discover -s tools/tests -v
+      # The fake portal the plugin is developed against must keep the shape of the real portal's answers.
+      - run: python -m unittest discover -s dev/tests -v
