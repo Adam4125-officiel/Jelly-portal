@@ -145,13 +145,19 @@ bump, conventions tests, run the real server): follow it there.
 
 ## Releases
 
-Tags: `vX.Y.Z-rc.N` (pre-release, N >= 1) or `vX.Y.Z` (stable). Anything else fails the workflow.
-Regex `^v\d+\.\d+\.\d+(-rc\.\d+)?$`; `rc.0` is also refused (it would equal the stable version).
+Tags: `vX.Y.Z-rc.N` (pre-release, **N from 1 to 99**) or `vX.Y.Z` (stable). Anything else fails the
+workflow. Regex `^v\d+\.\d+\.\d+(-rc\.\d+)?$`, plus: `rc.0` and `rc.100` or more are refused.
 
 | Tag | Jellyfin version |
 |---|---|
 | `vX.Y.Z-rc.N` | `X.Y.Z.N` |
-| `vX.Y.Z` | `X.Y.Z.0` |
+| `vX.Y.Z` | `X.Y.Z.100` |
+
+**The stable release is the highest number of its series, on purpose** (owner's decision,
+2026-10-13; the first mapping, stable = `.0`, had it *below* its own RCs, so a Jellyfin that had
+installed `rc.2` was never offered the stable). `.100` is above every possible RC (`.1`..`.99`) and
+below the next series' first candidate. Tests pin all of this; `STABLE_BUILD` in
+`tools/release_info.py` is the one definition.
 
 Jellyfin versions are four numbers with no suffix. Semver meaning: `Z` fix, `Y` feature, `X`
 breaking (a new major Jellyfin, an incompatible config change).
@@ -172,10 +178,11 @@ breaking (a new major Jellyfin, an incompatible config change).
   `.../manifest/manifest-unstable.json`.
 - `build.yaml` holds the Jellyfin packaging metadata; its `version` is the placeholder `0.0.0.0`.
   `Directory.Build.props` defaults `Version` to `0.0.0.0` for local builds only.
-  `tools/package_plugin.py` **refuses a DLL that does not contain the version it is told it has**.
-- **Known quirk, by the owner's design:** since a stable is `X.Y.Z.0` and RCs are `X.Y.Z.N`, the
-  stable of a series sorts *below* its own RCs numerically. Same code, so harmless, but a Jellyfin
-  that installed `rc.2` (`X.Y.Z.2`) will not be offered the stable `X.Y.Z.0` as an update.
+  `tools/package_plugin.py` **refuses a DLL that does not contain the version it is told it has**
+  (and a version whose last part is outside 1..100).
+- `tools/package_plugin.py` also checks the version string against the **wide, NUL-terminated**
+  resource inside the DLL with both ends anchored: a plain substring test would accept `0.1.0.1` in a
+  `0.1.0.100` build. Tested against real DLLs, not only fakes.
 - GitHub Actions run steps under `bash -e` **without** `pipefail` unless `shell: bash` is set; the
   workflows set it as a default. Keep it, or `cmd | tee` will mask failures. Pass values to scripts
   through `env:`, never inline `${{ }}` inside `run:` (a tag name is attacker-shaped input).
