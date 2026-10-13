@@ -68,6 +68,7 @@ jobs:
           python -m unittest discover -s tools/tests
           python -m unittest discover -s dev/tests
           tools/check_js.sh
+          node --test client-tests/*.test.js
 
       - name: Changelog
         run: python tools/changelog.py "$GITHUB_REF_NAME" --compare-base "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" | tee changelog.md

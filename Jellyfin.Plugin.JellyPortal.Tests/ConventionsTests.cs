@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using Jellyfin.Plugin.JellyPortal.Summary;
 
 namespace Jellyfin.Plugin.JellyPortal.Tests;
 
@@ -61,5 +62,52 @@ public class ConventionsTests
                 calls.Matches(text).Count == prefixed.Matches(text).Count,
                 $"{Path.GetFileName(file)} has a console call whose first argument does not start with '[JellyPortal]'.");
         }
+    }
+
+    private static string ClientScript() => File.ReadAllText(Path.Combine(RepoFiles.Root, "Jellyfin.Plugin.JellyPortal", "Web", "jellyportal.js"));
+
+    private static List<string> KeysOf(string script, string variable)
+    {
+        var block = Regex.Match(script, @"var " + variable + @" = \{(?<body>.*?)\n    \};", RegexOptions.Singleline);
+        Assert.True(block.Success, $"{variable} not found in the client script");
+        return Regex.Matches(block.Groups["body"].Value, @"^\s+(\w+):", RegexOptions.Multiline).Select(m => m.Groups[1].Value).ToList();
+    }
+
+    [Fact]
+    public void TheClientKnowsEveryStateTheServerCanSend()
+    {
+        var wire = Enum.GetValues<Jellyfin.Plugin.JellyPortal.Summary.SummaryState>().Select(s => s.Name()).OrderBy(x => x, StringComparer.Ordinal);
+        Assert.Equal(wire, KeysOf(ClientScript(), "STATE_TITLES").OrderBy(x => x, StringComparer.Ordinal));
+    }
+
+    [Fact]
+    public void TheClientHasASentenceForEveryReasonTheServerCanSend()
+    {
+        // jellyfin_unreachable is the client's own: the Jellyfin server itself could not be asked.
+        var wire = Enum.GetValues<Jellyfin.Plugin.JellyPortal.Summary.SummaryFailure>().Select(f => f.Name()).Append("jellyfin_unreachable").OrderBy(x => x, StringComparer.Ordinal);
+        Assert.Equal(wire, KeysOf(ClientScript(), "REASON_TEXTS").OrderBy(x => x, StringComparer.Ordinal));
+    }
+
+    [Fact]
+    public void TheClientNeverBuildsHtmlFromWhatTheServerSends()
+    {
+        // Titles, names and messages come from the portal and from other people: textContent only.
+        var script = ClientScript();
+        Assert.DoesNotContain("innerHTML", script, StringComparison.Ordinal);
+        Assert.DoesNotContain("outerHTML", script, StringComparison.Ordinal);
+        Assert.DoesNotContain("insertAdjacentHTML", script, StringComparison.Ordinal);
+        Assert.DoesNotContain("document.write", script, StringComparison.Ordinal);
+        Assert.DoesNotContain("eval(", script, StringComparison.Ordinal);
+        Assert.DoesNotContain("new Function", script, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TheClientScriptLoadsNothingFromElsewhere()
+    {
+        // No CDN, no framework, no font, no image from another host.
+        var asset = File.ReadAllText(Path.Combine(RepoFiles.Root, "Jellyfin.Plugin.JellyPortal", "Web", "jellyportal.css")) + ClientScript();
+        Assert.DoesNotMatch(@"https?://(?!www\.w3\.org/2000/svg)", asset);
+        Assert.DoesNotContain("@import", asset, StringComparison.Ordinal);
+        Assert.DoesNotContain("url(", asset, StringComparison.Ordinal);
     }
 }

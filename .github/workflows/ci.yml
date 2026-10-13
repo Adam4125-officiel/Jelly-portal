@@ -63,6 +63,8 @@ jobs:
         with:
           node-version: "24"
       - run: tools/check_js.sh
+      # Durations, local times across both daylight-saving changes, clock skew, bubble placement, wording.
+      - run: node --test client-tests/*.test.js
 
   release-tools:
     name: Release tooling
