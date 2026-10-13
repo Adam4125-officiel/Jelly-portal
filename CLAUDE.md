@@ -150,12 +150,26 @@ and refreshes immediately when the tab returns.
    days); priority services (by name, one per line, case-insensitive); visibility (all users / admins
    only). Without a URL or key the state is `unknown` with `reason: not_configured`, and the config
    page says what is wrong in words.
+   **The settings page (`Configuration/configPage.html`, in French, reachable from the dashboard sidebar and
+   from Plugins) talks only to this plugin's own endpoints**, all admin-only (`RequiresElevation`):
+   `GET/POST /JellyPortal/Config` and `POST /JellyPortal/Config/Test`. It must never use Jellyfin's generic
+   `getPluginConfiguration`/`updatePluginConfiguration`: that API would hand the portal key to the browser, and
+   posting the whole object back would erase it (a test pins this). The view carries `hasApiKey`, never the
+   key; **a blank key field means "keep the saved one"** (the page never has it), `clearApiKey` erases it.
+   Numbers are clamped by the server and echoed back (polling 10 s-1 h, cache 5 s-10 min, window 1 h-30 days;
+   the page takes its `min`/`max` from the server, so the browser's own validation refuses an out-of-range
+   value before it is sent); an address that is not plain `http(s)://host[:port][/prefix]` is refused with a
+   sentence. "Tester la connexion" asks the portal now with the address and key *as typed*, saved or not (an
+   explicit admin action, so the one sanctioned wait on the network) and answers in words per failure reason.
+   The page writes text with `textContent` only, never HTML. A refused value (400) is a normal answer, not a
+   console error.
 2. `GET /JellyPortal/Summary`, `[Authorize]` (any signed-in Jellyfin user; `403` for a non-admin when
    visibility is "admins only", and the client then does nothing). Queries the portal **server-side**,
    caches the *raw reading* for the TTL (N browsers = one request to the portal; a failure is cached
    for the same time so a dead portal costs one timeout per TTL, not one per browser) and **recomputes
    the state on every request** against the portal's clock, so a window that starts between two
-   readings turns "soon" into "in progress" on time. Returns `SummaryDto` (`Summary/SummaryDto.cs`:
+   readings turns "soon" into "in progress" on time. The summary carries `pollSeconds` (the configured polling
+   interval), so a running page follows a changed setting at its next poll. Returns `SummaryDto` (`Summary/SummaryDto.cs`:
    every property has an explicit JSON name, because the host's JSON options are PascalCase and could
    change). It never returns a 5xx for a portal problem.
 3. An endpoint that serves the client JS/CSS (`[AllowAnonymous]`: the script has to load before
@@ -340,6 +354,12 @@ Working rules that follow:
   holds real answers captured from the portal's own route; `dev/tests/test_fake_portal.py` compares the fake's
   keys, key order and timestamp format with them, and `PortalContractTests` parses them with the real parser.
   If the portal's contract changes, re-capture the fixtures from its real route, never by hand.
+- **End-to-end checks in a real Chromium** live in `dev/e2e/` (run by hand against the Docker Jellyfin, not in CI;
+  `dev/data/venv` holds Playwright): `common.py` (launch, real login, a `Recorder` of console/page errors/failed
+  requests/response bodies) and `config_page.py` (the settings page against every fake-portal failure, key
+  never received, save/clear/refuse). Jellyfin's own client logs a console error before sign-in (a refused
+  WebSocket); "no console error" therefore means none *of ours*: a `[JellyPortal]` error/warning, a page error
+  naming the plugin, or a failed request under `/JellyPortal/`.
 - C# unit tests for the state computation (every priority, every combination), the client, the cache and
   the configuration, run by `ci.yml`; so do the Python tests of `tools/` and `dev/`.
 - **Playwright headless** screenshots of the header and the open bubble for every scenario, in **Modern and
