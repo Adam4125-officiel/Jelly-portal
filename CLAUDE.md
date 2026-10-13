@@ -87,16 +87,21 @@ errors in normal cases**. UI text is French.
 the header, so use a `MutationObserver`; never create a duplicate; it must survive navigation, in
 Modern and Legacy layouts.
 
-**States, one shown at a time, by decreasing priority:**
+**States, one shown at a time, by decreasing priority (spec revised by the owner 2026-10-13):**
 
-| # | State | Look |
-|---|---|---|
-| 1 | `down` (at least one service down) | red |
-| 2 | `maintenance_ongoing` | orange with a gentle pulse, to draw the eye |
-| 3 | `degraded` | solid orange |
-| 4 | `maintenance_soon` (inside the configured window) | normal icon + **clock badge**; badge only if the maintenance touches a priority service or falls in the window |
-| 5 | `ok` | white / same colour as the other header icons (discreet) |
-| 6 | `unknown` (portal unreachable) | grey, **never red** |
+| # | State | Meaning | Look |
+|---|---|---|---|
+| 1 | Down | at least one service is down | red |
+| 2 | Maintenance in progress | a maintenance is under way | **violet**, gentle pulse (it must catch the eye) |
+| 3 | Degraded | a service is degraded | orange |
+| 4 | Maintenance soon | a maintenance is planned inside the configured window | normal icon + **clock badge** |
+| 5 | OK | all is well | discreet, same colour as the other header icons |
+| 6 | Unknown | the portal is unreachable | grey, **never red** |
+
+**Orange is reserved for Degraded.** A planned maintenance is not an outage, and it has to look
+different from one. The clock badge is shown only if the maintenance touches a priority service or
+falls inside the window. The internal state names are `down`, `maintenance_ongoing`, `degraded`,
+`maintenance_soon`, `ok`, `unknown`.
 
 **The panel is a bubble (popover), not a page.** Binding, repeated by the owner:
 

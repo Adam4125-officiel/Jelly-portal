@@ -54,10 +54,10 @@ The icon shows one state at a time:
 | State | Meaning | Look |
 |---|---|---|
 | Down | at least one service is down | red |
-| Maintenance in progress | | orange, gently pulsing |
+| Maintenance in progress | a maintenance window is under way | violet, gently pulsing |
 | Degraded | a service is degraded | orange |
 | Maintenance soon | one is scheduled inside the window | normal icon with a clock badge |
-| OK | | discreet, like the other header icons |
+| OK | everything is fine | discreet, like the other header icons |
 | Unknown | the portal cannot be reached | grey (never red) |
 
 Clicking it opens a bubble under the icon: no page change, closes on a click outside, on Escape or
