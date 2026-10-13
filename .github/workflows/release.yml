@@ -66,6 +66,7 @@ jobs:
         run: |
           dotnet test Jellyfin.Plugin.JellyPortal.sln -c Release --no-build
           python -m unittest discover -s tools/tests
+          python -m unittest discover -s dev/tests
           tools/check_js.sh
 
       - name: Changelog
