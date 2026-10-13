@@ -45,4 +45,44 @@ public class JellyPortalController : ControllerBase
         // Serialised here, not by the host: the host's JSON options are PascalCase and are not ours to depend on.
         return Content(SummaryJson.Serialize(summary), MediaTypeNames.Application.Json);
     }
+
+    /// <summary>Gets the script injected into the Jellyfin web client.</summary>
+    /// <response code="200">The script.</response>
+    /// <response code="304">The browser's copy is current.</response>
+    /// <returns>The script. Anonymous on purpose: it loads before anyone has signed in, and it carries no data.</returns>
+    [HttpGet("client.js")]
+    [AllowAnonymous]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status304NotModified)]
+    public IActionResult GetClientScript() => Asset("client.js");
+
+    /// <summary>Gets the stylesheet injected into the Jellyfin web client.</summary>
+    /// <response code="200">The stylesheet.</response>
+    /// <response code="304">The browser's copy is current.</response>
+    /// <returns>The stylesheet.</returns>
+    [HttpGet("client.css")]
+    [AllowAnonymous]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status304NotModified)]
+    public IActionResult GetClientStyle() => Asset("client.css");
+
+    private IActionResult Asset(string name)
+    {
+        var asset = ClientAssets.Find(name);
+        if (asset is null)
+        {
+            return NotFound();
+        }
+
+        // no-cache means "revalidate every time", and the ETag makes that a cheap 304. The address also carries ?v=version.
+        Response.Headers.CacheControl = "no-cache";
+        Response.Headers.ETag = asset.ETag;
+        Response.Headers["X-Content-Type-Options"] = "nosniff";
+        if (Request.Headers.IfNoneMatch.ToString().Contains(asset.ETag, StringComparison.Ordinal))
+        {
+            return StatusCode(StatusCodes.Status304NotModified);
+        }
+
+        return File(asset.Bytes, asset.ContentType);
+    }
 }

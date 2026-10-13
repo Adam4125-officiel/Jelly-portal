@@ -17,6 +17,7 @@
          (a test checks that the versions match the target ABI). -->
     <PackageReference Include="Jellyfin.Model" Version="12.2.0" />
     <PackageReference Include="Jellyfin.Controller" Version="12.2.0" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
   </ItemGroup>
 
   <ItemGroup>

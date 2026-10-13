@@ -1,3 +1,4 @@
+using Jellyfin.Plugin.JellyPortal.Injection;
 using Jellyfin.Plugin.JellyPortal.Portal;
 using MediaBrowser.Controller;
 using MediaBrowser.Controller.Plugins;
@@ -17,5 +18,8 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddSingleton<PortalCache>();
         serviceCollection.AddSingleton<ISettingsProvider, PluginSettingsProvider>();
         serviceCollection.AddSingleton<SummaryService>();
+        serviceCollection.AddSingleton<InjectionStatus>();
+        serviceCollection.AddSingleton<FileTransformationBridge>();
+        serviceCollection.AddHostedService<FileTransformationRegistrar>();
     }
 }
