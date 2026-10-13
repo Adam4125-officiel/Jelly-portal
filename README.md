@@ -7,8 +7,9 @@ header icons. The icon reflects the overall state of your self-hosted services a
 bubble over the current page with the details: services, maintenance in progress or coming up, and
 active announcements.
 
-> **Status: early development.** The repository, CI and release pipeline are in place; the plugin
-> itself does not do anything yet. This README describes what it is being built to do.
+> **Status: early development.** The repository, the release pipeline, the connection to the portal, the settings
+> page and the injection into the web client are in place and tested; the icon and its bubble are the next step. This
+> README describes what it is being built to do.
 
 ## Requirements
 
@@ -35,17 +36,25 @@ Android TV, Swiftfin, Findroid and similar clients will not show it.
 
 ## Configuration
 
-Dashboard > Plugins > Jelly Portal (planned settings):
+Dashboard > Plugins > **Jelly Portal** (also in the dashboard sidebar). Changes apply immediately, no restart.
 
 | Setting | Default |
 |---|---|
-| Status Portal URL | none |
-| API key (optional, kept on the server, never sent to browsers) | none |
-| Browser polling interval | 60 s |
-| Server cache lifetime | 30 s |
-| "Maintenance coming up" window | 24 h |
-| Priority services (their maintenance stands out) | none |
-| Visible to | all users / admins only |
+| Portal address, as the Jellyfin server reaches it (`http://192.168.1.10:5000`) | none |
+| Key of the portal's **Display device** API (portal administration, page *Display device*) | none |
+| Visible to | all users / administrators only |
+| Priority services (one name per line): their maintenance and incidents are put forward in the bubble | none |
+| "Maintenance coming up" window (1 h to 30 days) | 24 h |
+| Browser refresh interval (10 s to 1 h) | 60 s |
+| Server cache lifetime (5 s to 10 min): however many browsers are open, the portal is asked once per lifetime | 30 s |
+
+The key stays on the server: it is never sent to a browser, and it is not shown again once saved (leave the field
+blank to keep it). **Test the connection** tries the address and key as typed, before saving, and says in words what
+is wrong (API switched off in the portal, wrong key, unreachable, portal too old...). The page also tells you whether
+File Transformation is installed.
+
+The portal must be **Status Portal 1.12.0 or newer** (it adds the `detail=full` option this plugin reads) with its
+Display device API switched on.
 
 ## How it will look
 

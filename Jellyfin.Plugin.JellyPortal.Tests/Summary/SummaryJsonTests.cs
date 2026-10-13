@@ -15,7 +15,7 @@ public class SummaryJsonTests
     public void TheTopLevelKeysAreTheContract()
     {
         var root = Serialised(Calc(Snapshot()));
-        Assert.Equal(["schema", "state", "reason", "now", "portal", "services", "incidents", "maintenance", "announcements"], Keys(root));
+        Assert.Equal(["schema", "state", "reason", "now", "pollSeconds", "portal", "services", "incidents", "maintenance", "announcements"], Keys(root));
         Assert.Equal(["name", "url", "fetchedAt"], Keys(root.GetProperty("portal")));
         Assert.Equal(["ongoing", "upcoming"], Keys(root.GetProperty("maintenance")));
     }

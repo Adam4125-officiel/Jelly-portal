@@ -26,6 +26,10 @@ public sealed class SummaryDto
     [JsonPropertyName("now")]
     public string Now { get; init; } = string.Empty;
 
+    /// <summary>Gets how often, in seconds, the browser should ask again. A running page follows a changed setting at its next poll.</summary>
+    [JsonPropertyName("pollSeconds")]
+    public int PollSeconds { get; init; } = 60;
+
     /// <summary>Gets where this came from.</summary>
     [JsonPropertyName("portal")]
     public PortalInfoDto Portal { get; init; } = new();

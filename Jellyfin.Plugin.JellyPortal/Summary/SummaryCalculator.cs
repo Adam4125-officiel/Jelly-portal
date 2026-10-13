@@ -16,13 +16,15 @@ public static class SummaryCalculator
     /// <param name="options">The settings.</param>
     /// <param name="portalUrl">The portal's address, for the link.</param>
     /// <param name="fetchedAt">When the portal was read, on this machine's clock.</param>
+    /// <param name="pollSeconds">The configured polling interval, passed on to the browser.</param>
     /// <returns>The summary.</returns>
     public static SummaryDto Calculate(
         PortalSnapshot snapshot,
         DateTimeOffset asOf,
         SummaryOptions options,
         string portalUrl,
-        DateTimeOffset fetchedAt)
+        DateTimeOffset fetchedAt,
+        int pollSeconds = 60)
     {
         var priority = new HashSet<string>(options.PriorityServices, StringComparer.OrdinalIgnoreCase);
         bool IsPriority(IEnumerable<string> names) => names.Any(priority.Contains);
@@ -89,6 +91,7 @@ public static class SummaryCalculator
         {
             State = state.Name(),
             Now = PortalTime.Format(asOf),
+            PollSeconds = pollSeconds,
             Portal = new PortalInfoDto { Name = snapshot.SiteName, Url = portalUrl, FetchedAt = PortalTime.Format(fetchedAt) },
             Services = snapshot.Services
                 .Select(s => new ServiceDto { Name = s.Name, Status = StatusName(s.Status), Priority = priority.Contains(s.Name) })
@@ -116,12 +119,14 @@ public static class SummaryCalculator
     /// <param name="reason">Why.</param>
     /// <param name="portalUrl">The configured address, if any, so the panel can still link to it.</param>
     /// <param name="utcNow">This machine's clock.</param>
+    /// <param name="pollSeconds">The configured polling interval, passed on to the browser.</param>
     /// <returns>The summary.</returns>
-    public static SummaryDto Unavailable(SummaryFailure reason, string portalUrl, DateTimeOffset utcNow) => new()
+    public static SummaryDto Unavailable(SummaryFailure reason, string portalUrl, DateTimeOffset utcNow, int pollSeconds = 60) => new()
     {
         State = SummaryState.Unknown.Name(),
         Reason = reason.Name(),
         Now = PortalTime.Format(utcNow),
+        PollSeconds = pollSeconds,
         Portal = new PortalInfoDto { Url = portalUrl },
     };
 
