@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 """Validate a release tag and derive everything the release workflow needs from it.
 
-Tag format (strict):   vX.Y.Z-rc.N  (a release candidate, N >= 1)   or   vX.Y.Z  (stable)
+Tag format (strict):   vX.Y.Z-rc.N  (a release candidate, N from 1 to 99)   or   vX.Y.Z  (stable)
 
 Jellyfin wants four-part numeric versions with no suffix, so:
-    vX.Y.Z-rc.N  ->  X.Y.Z.N
-    vX.Y.Z       ->  X.Y.Z.0
+    vX.Y.Z-rc.N  ->  X.Y.Z.N      (N = 1..99)
+    vX.Y.Z       ->  X.Y.Z.100
+
+The stable build number is above every possible RC number, so a Jellyfin that installed a release
+candidate is always offered the stable release of the same version.
 
 The version comes from the tag and nowhere else.
 """
@@ -21,6 +24,11 @@ TAG_RE = re.compile(r"^v(\d+)\.(\d+)\.(\d+)(?:-rc\.(\d+))?$")
 # .NET refuses an assembly/file version part above 65534.
 MAX_PART = 65534
 
+# Release candidates are numbered 1..MAX_RC; a stable release takes STABLE_BUILD, strictly above
+# every possible RC, so it always sorts last in its series.
+MAX_RC = 99
+STABLE_BUILD = MAX_RC + 1
+
 
 class TagError(ValueError):
     """The tag is not an acceptable release tag."""
@@ -35,12 +43,12 @@ def parse_tag(tag: str) -> dict:
         )
     major, minor, patch = (int(match.group(i)) for i in (1, 2, 3))
     rc = int(match.group(4)) if match.group(4) is not None else None
-    if rc is not None and rc < 1:
+    if rc is not None and not 1 <= rc <= MAX_RC:
         raise TagError(
-            f"'{tag}': release candidates start at rc.1. rc.0 would map to X.Y.Z.0, "
-            "the same Jellyfin version as the stable release."
+            f"'{tag}': release candidates are numbered rc.1 to rc.{MAX_RC}. The number is the last part of the "
+            f"Jellyfin version, and the stable release takes .{STABLE_BUILD}, which must stay above every RC."
         )
-    for part in (major, minor, patch, rc or 0):
+    for part in (major, minor, patch):
         if part > MAX_PART:
             raise TagError(f"'{tag}': version numbers above {MAX_PART} cannot be used as a .NET assembly version.")
     base = f"{major}.{minor}.{patch}"
@@ -49,7 +57,7 @@ def parse_tag(tag: str) -> dict:
         "base": base,
         "rc": rc,
         "prerelease": rc is not None,
-        "jellyfin_version": f"{base}.{rc if rc is not None else 0}",
+        "jellyfin_version": f"{base}.{rc if rc is not None else STABLE_BUILD}",
     }
 
 
