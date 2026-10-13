@@ -15,8 +15,9 @@ available to later sessions; everything binding in it is here. Repository conten
    `PluginIdentity.Id`, `build.yaml` and this file, and a test keeps all three equal.
 3. **You may create and push `-rc.N` tags. You never create a stable `vX.Y.Z` tag.** The owner
    promotes. A published tag is never deleted or moved: if an RC is broken, the fix is the next RC.
-4. **No force-push on `main`.** After the initial setup, every change is a branch (`feat/...`,
-   `fix/...`) and a PR into `main`, so CI runs.
+   GitHub now enforces this (see *Git workflow and branch protection*), so a burnt RC number stays burnt.
+4. **Everything goes through a branch (`feat/...`, `fix/...`) and a pull request.** `main` is
+   protected, with no bypass for anyone, admins included. You may merge your own PRs once CI is green.
 5. **No version number is written anywhere in the code.** It comes from the git tag and is injected
    at build time (see *Releases*).
 6. **Say what you actually verified.** Passing unit tests proved little in the sibling projects;
@@ -196,11 +197,35 @@ The owner's steps (also in the README): merge PRs on `main`; `git tag vX.Y.Z-rc.
 vX.Y.Z-rc.1`; test on production through the unstable repository; on a bug, fix and tag `rc.2`;
 when an RC is validated, the owner tags `vX.Y.Z` on that RC's commit.
 
+## Git workflow and branch protection
+
+Enabled on 2026-10-13 at the owner's request, as two GitHub **rulesets with no bypass actors**
+(admins are not exempt; editing a ruleset is the only way around them, and that is the owner's call):
+
+- **`Protect main`**: a pull request is required (**no reviews required**: the owner works alone);
+  the checks **`Build and test`**, `Client JS syntax` and `Release tooling` must pass; no force-push
+  (non-fast-forward) and no deletion. The branch does not have to be up to date with `main`.
+- **`Protect release tags`** (`refs/tags/v*`): no deletion, no update (so no moving), no force. Creating
+  a tag is allowed, and that is how a release starts. The `manifest` branch is not covered: the
+  release workflow pushes to it.
+
+Working rules that follow:
+
+- One branch at a time per topic (`feat/...`, `fix/...`), small Conventional Commits, a PR into `main`.
+  Open the PR as soon as the first push is done so CI runs. **You may merge your own PRs once the
+  three checks are green**, with a regular merge commit (`gh pr merge N --merge`), not squash or
+  rebase: the changelog is built from individual commits (`git log --no-merges`), so each small
+  commit must survive on `main`.
+- A docs-only change also takes a PR. The Status Portal repo's "docs straight to main" shortcut does
+  not exist here.
+- Tags are cut on `main` after the merge. An RC whose release workflow failed is **not** repaired by
+  deleting its tag (that is blocked); fix the cause and tag the next RC.
+- The release workflow is read from the tagged commit, so a fix to `release.yml` only takes effect
+  from the next tag.
+
 ## Project phases and gates
 
-1. **Phase 1 - repository and release machinery.** Done once the owner has approved the tree and the
-   workflows. Branch protection for `main` (required status checks: `Build and test`,
-   `Client JS syntax`, `Release tooling`) is *proposed*, never enabled without the owner's say.
+1. **Phase 1 - repository and release machinery.** Done and approved by the owner (2026-10-13).
 2. **Release test** with an empty plugin: `v0.0.1-rc.1`; check the Release, the unstable manifest,
    and that the dev Jellyfin installs it from the unstable URL.
 3. **Phase 2 - the plugin.** Clone the refs; then **propose a short plan (code structure and the
