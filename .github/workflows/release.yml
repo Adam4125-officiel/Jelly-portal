@@ -1,0 +1,152 @@
+name: Release
+
+# Push a tag vX.Y.Z-rc.N (release candidate) or vX.Y.Z (stable). See "Releasing" in the README.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+# An explicit `shell: bash` runs steps with `-eo pipefail`. Without it a failing command in a
+# pipeline such as `release_info.py | tee` would be masked by tee's exit status.
+defaults:
+  run:
+    shell: bash
+
+# Never two releases at once: both would rewrite the manifest branch.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build, test and publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      prerelease: ${{ steps.info.outputs.prerelease }}
+      jellyfin_version: ${{ steps.info.outputs.jellyfin_version }}
+      zip_name: ${{ steps.package.outputs.zip_name }}
+      md5: ${{ steps.package.outputs.md5 }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # the changelog and the "stable needs an RC" rule read tags and history
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.x"
+
+      - run: pip install pyyaml
+
+      # Rejects anything but vX.Y.Z-rc.N / vX.Y.Z, and a stable tag whose commit has no
+      # vX.Y.Z-rc.N tag. Everything below takes the version from here and nowhere else.
+      - name: Validate the tag and compute the Jellyfin version
+        id: info
+        run: python tools/release_info.py "$GITHUB_REF_NAME" --check-rc-on "$GITHUB_SHA" | tee -a "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+
+      - name: Build
+        env:
+          VERSION: ${{ steps.info.outputs.jellyfin_version }}
+        run: |
+          dotnet restore Jellyfin.Plugin.JellyPortal.sln
+          dotnet build Jellyfin.Plugin.JellyPortal.sln -c Release --no-restore -p:Version="$VERSION"
+
+      # If anything below fails, nothing has been published yet.
+      - name: Tests
+        run: |
+          dotnet test Jellyfin.Plugin.JellyPortal.sln -c Release --no-build
+          python -m unittest discover -s tools/tests
+          tools/check_js.sh
+
+      - name: Changelog
+        run: python tools/changelog.py "$GITHUB_REF_NAME" --compare-base "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" | tee changelog.md
+
+      - name: Package
+        id: package
+        env:
+          VERSION: ${{ steps.info.outputs.jellyfin_version }}
+        run: |
+          dotnet publish Jellyfin.Plugin.JellyPortal/Jellyfin.Plugin.JellyPortal.csproj \
+            -c Release --no-build -o publish -p:Version="$VERSION"
+          python tools/package_plugin.py --version "$VERSION" --publish-dir publish \
+            --out-dir artifacts --changelog-file changelog.md | tee package.out
+          zip_path=$(sed -n 's/^zip=//p' package.out)
+          {
+            echo "zip_name=$(basename "$zip_path")"
+            echo "zip_path=$zip_path"
+            echo "md5=$(sed -n 's/^md5=//p' package.out)"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PRERELEASE: ${{ steps.info.outputs.prerelease }}
+          ZIP_PATH: ${{ steps.package.outputs.zip_path }}
+        run: |
+          flags=()
+          if [ "$PRERELEASE" = "true" ]; then flags+=(--prerelease); else flags+=(--latest); fi
+          gh release create "$GITHUB_REF_NAME" "$ZIP_PATH" \
+            --verify-tag --title "$GITHUB_REF_NAME" --notes-file changelog.md "${flags[@]}"
+
+  manifest:
+    name: Update the plugin manifest
+    needs: release
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/checkout@v7
+        with:
+          ref: manifest
+          path: manifest-branch
+
+      # The checksum is computed from the file served at the public URL, i.e. the exact
+      # bytes Jellyfin will download, and compared with the zip the release job built.
+      - name: Fetch the published zip
+        env:
+          ZIP_NAME: ${{ needs.release.outputs.zip_name }}
+          EXPECTED_MD5: ${{ needs.release.outputs.md5 }}
+        run: |
+          url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/download/$GITHUB_REF_NAME/$ZIP_NAME"
+          mkdir -p downloaded
+          curl -fsSL --retry 6 --retry-delay 5 --retry-all-errors -o "downloaded/$ZIP_NAME" "$url"
+          actual=$(md5sum "downloaded/$ZIP_NAME" | cut -d' ' -f1 | tr 'a-f' 'A-F')
+          if [ "$actual" != "$EXPECTED_MD5" ]; then
+            echo "::error::Published zip has MD5 $actual, the release job built $EXPECTED_MD5" >&2
+            exit 1
+          fi
+          echo "SOURCE_URL=$url" >> "$GITHUB_ENV"
+
+      - name: Update the manifests
+        env:
+          ZIP_NAME: ${{ needs.release.outputs.zip_name }}
+          PRERELEASE: ${{ needs.release.outputs.prerelease }}
+        run: |
+          python tools/update_manifest.py \
+            --zip "downloaded/$ZIP_NAME" --source-url "$SOURCE_URL" --prerelease "$PRERELEASE" \
+            --stable-manifest manifest-branch/manifest.json \
+            --unstable-manifest manifest-branch/manifest-unstable.json
+
+      - name: Commit to the manifest branch
+        working-directory: manifest-branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add manifest.json manifest-unstable.json
+          if git diff --cached --quiet; then
+            echo "Manifests already up to date."
+            exit 0
+          fi
+          git commit -m "chore(manifest): publish $GITHUB_REF_NAME"
+          git push origin HEAD:manifest

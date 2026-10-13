@@ -1,0 +1,77 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# An explicit `shell: bash` runs steps with `-eo pipefail`. Without it a failing command in a
+# pipeline such as `release_info.py | tee` would be masked by tee's exit status.
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: Build and test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.x"
+
+      - name: Restore
+        run: dotnet restore Jellyfin.Plugin.JellyPortal.sln
+
+      - name: Build (Release)
+        run: dotnet build Jellyfin.Plugin.JellyPortal.sln -c Release --no-restore
+
+      - name: Unit tests
+        run: dotnet test Jellyfin.Plugin.JellyPortal.sln -c Release --no-build
+
+      # Exercises the same packaging the release workflow uses, so a packaging
+      # problem shows up on a pull request rather than on a tag.
+      - name: Package (dry run)
+        run: |
+          pip install pyyaml
+          dotnet publish Jellyfin.Plugin.JellyPortal/Jellyfin.Plugin.JellyPortal.csproj \
+            -c Release -o publish -p:Version=0.0.0.1
+          python tools/package_plugin.py --version 0.0.0.1 --publish-dir publish --out-dir artifacts
+          unzip -l artifacts/*.zip
+
+  client-js:
+    name: Client JS syntax
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+      - run: tools/check_js.sh
+
+  release-tools:
+    name: Release tooling
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.x"
+      - run: pip install pyyaml
+      - run: python -m unittest discover -s tools/tests -v
