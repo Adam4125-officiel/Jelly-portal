@@ -307,31 +307,56 @@ Working rules that follow:
 
 ## Dev loop and tests (mandatory in phase 2)
 
-- Jellyfin **12.2** in Docker on this VM (`jellyfin/jellyfin:12.2`), plugins directory mounted as a
-  volume, File Transformation 3.x installed in it. Data lives under `dev/data/` (gitignored).
-- A **fake status portal** in `dev/` that can simulate: all OK / a service down / degraded /
-  maintenance in progress / maintenance in 2 h / maintenance in 3 days / portal timing out.
-- `dev/dev.sh`: build -> copy the DLL -> restart the container -> show the plugin's log lines.
-- C# unit tests for the global-state computation (all priorities, combined cases), run by `ci.yml`.
-- **Playwright headless** screenshots of the header and the open bubble for every scenario, in
-  **Modern and Legacy** layouts, **desktop and mobile width**, saved in `./screenshots/`. Look at
-  them yourself (Read the PNG; that is also how the owner sees them) before saying it is done.
-  Check specifically that it is **a bubble anchored to the icon** and that **the URL does not change
-  when it opens**.
+- **Jellyfin 12.2 in Docker** on this VM (`jellyfin/jellyfin:12.2`, container `jellyportal-dev`), listening on
+  `127.0.0.1:8096` only, File Transformation 3.x installed in it. Everything lives under `dev/data/`
+  (gitignored). `dev/jellyfin.sh up|down|restart|logs|reset`; `dev/jf.py` is a stdlib Jellyfin admin client
+  (`bootstrap`, `repos`, `packages`, `install`, `plugins`, `configure`, `create-user`, `summary`, `get`).
+- **`dev/dev.sh`**: build -> package with `tools/package_plugin.py` (the release's own path) -> install as
+  `Jelly Portal_0.0.0.1` -> restart -> show the plugin's log lines. **The dev Jellyfin must not have the Jelly
+  Portal repository configured** (only File Transformation's): plugins auto-update by default, and at startup
+  Jellyfin silently replaced the 0.0.0.1 dev build with the newest release from that repository. To test a
+  real release, add the unstable repository on purpose and install from the catalog.
+- **The plugin's configuration** is written with `dev/jf.py configure` (an XML file, read at start, so restart
+  after). It cannot be posted through Jellyfin's configuration API: the key is `[JsonIgnore]`d on purpose.
+- **Fake status portal** `dev/fake_portal.py`, bound to the Docker bridge gateway (`172.17.0.1:8099`, reachable
+  from the container, not from the LAN). It answers exactly the plugin's request and **refuses anything else
+  with a loud 400** (a query naming `resources`, `vms` or `jellyfin` above all). Scenarios, switchable while
+  it runs (`curl -X POST http://172.17.0.1:8099/__scenario/NAME`): `ok`, `slow`, `down`, `degraded`,
+  `incident_only`, `maintenance_ongoing`, `manual_maintenance`, `maintenance_soon` (in 2 h), `maintenance_far`
+  (in 3 days), `muted_window`, `announcements`, `busy` (everything at once), and the failures `timeout`,
+  `disabled` (404), `bad_key` (401), `outdated` (no `detail` marker), `bad_json`, `bad_gateway`, `slow_answer`.
+- **The fake must keep the real portal's shape.** `Jellyfin.Plugin.JellyPortal.Tests/Fixtures/portal-1.12.0/`
+  holds real answers captured from the portal's own route; `dev/tests/test_fake_portal.py` compares the fake's
+  keys, key order and timestamp format with them, and `PortalContractTests` parses them with the real parser.
+  If the portal's contract changes, re-capture the fixtures from its real route, never by hand.
+- C# unit tests for the state computation (every priority, every combination), the client, the cache and
+  the configuration, run by `ci.yml`; so do the Python tests of `tools/` and `dev/`.
+- **Playwright headless** screenshots of the header and the open bubble for every scenario, in **Modern and
+  Legacy** layouts, **desktop and mobile width**, saved in `./screenshots/`. Look at them yourself (Read the
+  PNG; that is also how the owner sees them) before saying it is done. Check specifically that it is **a
+  bubble anchored to the icon** and that **the URL does not change when it opens**.
 - Check the Jellyfin log: the plugin loads with no ABI warning, and a Jellyfin **without** File
   Transformation still starts.
 - Node and the .NET SDK are installed per-user: `export PATH=$HOME/.dotnet:$HOME/.local/node/bin:$PATH`.
   Playwright needs its own browser download (`pip install playwright`, then a scratch virtualenv).
+- **Verified live (2026-10-14), not just unit-tested:** the Summary endpoint through a real Jellyfin 12.2 for all
+  12 state scenarios and all 7 failure scenarios (always HTTP 200, one clear `[JellyPortal]` warning line per
+  failure, no stack trace, 5.1 s on a portal that never answers); 60 browser polls inside one cache lifetime
+  produce 1 request to the portal; 401 without a token, 403 for a non-admin when set to administrators only;
+  the key appears in no JSON answer, including Jellyfin's own `GET /Plugins/{id}/Configuration`, and stays in
+  the XML on disk.
 
 ## Repository map
 
 ```
-Jellyfin.Plugin.JellyPortal/         the plugin (Plugin.cs, PluginIdentity.cs, Configuration/, Web/ client JS)
+Jellyfin.Plugin.JellyPortal/         the plugin: Summary/ (pure logic), Portal/ (client, cache, service), Api/ (controller),
+                                     Configuration/, Web/ (client JS)
 Jellyfin.Plugin.JellyPortal.Tests/   xunit; also guards that build.yaml, the csproj and this file agree
 tools/                               release scripts (Python) + tests in tools/tests; check_js.sh
 .github/workflows/                   ci.yml, release.yml
 build.yaml  Directory.Build.props    packaging metadata; version placeholder
-dev/  refs/  screenshots/  artifacts/  local only (dev/data, refs, screenshots, artifacts are gitignored)
+dev/                                 fake portal, dev.sh, jellyfin.sh, jf.py and their tests (dev/data is gitignored)
+refs/  screenshots/  artifacts/      local only, gitignored
 ```
 
 Run before pushing: `dotnet test Jellyfin.Plugin.JellyPortal.sln`,
