@@ -121,8 +121,8 @@ falls inside the window. The internal state names are `down`, `maintenance_ongoi
   investigating / identified / monitoring, since when, services concerned); maintenance in progress
   (time remaining); upcoming maintenance (readable countdown such as "dans 3 h"), priority ones first
   and highlighted; active announcements; an "Ouvrir le status portal" link.
-- **Times are shown in the browser's local time zone, in French**: "aujourd'hui \u00e0 22:00",
-  "demain \u00e0 03:00", "dans 3 h", "se termine dans 45 min". The JSON stays UTC with a `Z`; the
+- **Times are shown in the browser's local time zone, in French**: "aujourd'hui à 22:00",
+  "demain à 03:00", "dans 3 h", "se termine dans 45 min". The JSON stays UTC with a `Z`; the
   conversion is client-side, after correcting the browser's clock skew with `SummaryDto.now`. A test
   covers it across both daylight-saving changes (the formatter takes the time zone as a parameter so it
   can be tested in any zone).
