@@ -1,0 +1,13 @@
+<Project>
+  <PropertyGroup>
+    <!-- The real version comes from the git tag: release.yml passes -p:Version=X.Y.Z.N.
+         0.0.0.0 only ever appears in local development builds. -->
+    <Version Condition="'$(Version)' == ''">0.0.0.0</Version>
+    <AssemblyVersion>$(Version)</AssemblyVersion>
+    <FileVersion>$(Version)</FileVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+</Project>
