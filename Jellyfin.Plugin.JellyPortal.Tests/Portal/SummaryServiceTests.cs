@@ -98,4 +98,16 @@ public class SummaryServiceTests
         Assert.Equal("maintenance_soon", dto.State);
         Assert.True(dto.Maintenance.Upcoming[0].Priority);
     }
+
+    [Fact]
+    public async Task ThePollingIntervalIsPassedOnToTheBrowserWhateverTheState()
+    {
+        _settings.Current = JellyPortalSettings.From(Url, "k", 45, 30, 24, "", false);
+        var good = await Service(Returning(Builders.Snapshot())).GetAsync(CancellationToken.None);
+        Assert.Equal(45, good.PollSeconds);
+        var failing = new CountingClient(_ => Task.FromResult(Failure(SummaryFailure.Timeout, _clock.GetUtcNow())));
+        Assert.Equal(45, (await Service(failing).GetAsync(CancellationToken.None)).PollSeconds);
+        _settings.Current = JellyPortalSettings.From("", "", 45, 30, 24, "", false);
+        Assert.Equal(45, (await Service(Returning(Builders.Snapshot())).GetAsync(CancellationToken.None)).PollSeconds);
+    }
 }
