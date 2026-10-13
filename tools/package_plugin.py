@@ -18,12 +18,30 @@ from pathlib import Path
 
 import yaml
 
+from release_info import STABLE_BUILD
+
 VERSION_RE = re.compile(r"^\d+\.\d+\.\d+\.\d+$")
 FIXED_ZIP_TIME = (1980, 1, 1, 0, 0, 0)
 
 
 class PackageError(ValueError):
     """The plugin cannot be packaged as asked."""
+
+
+def check_version(version: str) -> None:
+    """A packaged version is X.Y.Z.N with N from 1 (first RC) to STABLE_BUILD (the stable release)."""
+    if not VERSION_RE.fullmatch(version) or not 1 <= int(version.rsplit(".", 1)[1]) <= STABLE_BUILD:
+        raise PackageError(f"'{version}' is not a Jellyfin plugin version (X.Y.Z.N with N from 1 to {STABLE_BUILD})")
+
+
+def version_in_binary(version: str, binary: bytes) -> bool:
+    """True when the binary carries exactly this version string in its Win32 version resource.
+
+    The resource stores wide, NUL-terminated strings, so "0.1.0.1" must not be satisfied by
+    "0.1.0.10", "0.1.0.100" or "10.1.0.1": the match is anchored on both sides.
+    """
+    pattern = b"(?<![0-9.]\x00)" + re.escape(version.encode("utf-16-le")) + b"\x00\x00"
+    return re.search(pattern, binary) is not None
 
 
 def load_build_yaml(path: Path) -> dict:
@@ -68,8 +86,7 @@ def md5_of(path: Path) -> str:
 
 def package(build_yaml: Path, publish_dir: Path, out_dir: Path, version: str,
             changelog: str, timestamp: str) -> tuple[Path, str]:
-    if not VERSION_RE.fullmatch(version):
-        raise PackageError(f"'{version}' is not a four-part Jellyfin version (X.Y.Z.N)")
+    check_version(version)
     build = load_build_yaml(build_yaml)
     artifacts = [str(a) for a in build["artifacts"]]
 
@@ -83,7 +100,7 @@ def package(build_yaml: Path, publish_dir: Path, out_dir: Path, version: str,
     # The version must really be in the binary: a build that ignored -p:Version would otherwise
     # ship a plugin whose DLL says 0.0.0.0 under a manifest that says something else.
     main_dll = artifacts[0]
-    if version.encode("utf-16-le") not in files[main_dll]:
+    if not version_in_binary(version, files[main_dll]):
         raise PackageError(
             f"{main_dll} does not contain the version {version}. Was it built with -p:Version={version}?"
         )

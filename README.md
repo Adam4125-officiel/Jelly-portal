@@ -54,10 +54,10 @@ The icon shows one state at a time:
 | State | Meaning | Look |
 |---|---|---|
 | Down | at least one service is down | red |
-| Maintenance in progress | | orange, gently pulsing |
+| Maintenance in progress | a maintenance window is under way | violet, gently pulsing |
 | Degraded | a service is degraded | orange |
 | Maintenance soon | one is scheduled inside the window | normal icon with a clock badge |
-| OK | | discreet, like the other header icons |
+| OK | everything is fine | discreet, like the other header icons |
 | Unknown | the portal cannot be reached | grey (never red) |
 
 Clicking it opens a bubble under the icon: no page change, closes on a click outside, on Escape or
@@ -87,8 +87,8 @@ Versions come from git tags, never from the code.
 
 | Tag | Kind | Jellyfin version |
 |---|---|---|
-| `vX.Y.Z-rc.N` (N >= 1) | pre-release | `X.Y.Z.N` |
-| `vX.Y.Z` | stable | `X.Y.Z.0` |
+| `vX.Y.Z-rc.N` (N from 1 to 99) | pre-release | `X.Y.Z.N` |
+| `vX.Y.Z` | stable | `X.Y.Z.100` |
 
 Any other tag makes the release workflow fail. A stable tag is only accepted on a commit that
 already carries a `vX.Y.Z-rc.N` tag. Published tags are never deleted or moved: a broken release
@@ -106,9 +106,9 @@ creates the GitHub Release (a pre-release for an RC), and updates the `manifest`
 to `manifest-unstable.json` only, a stable release to `manifest.json` and `manifest-unstable.json`.
 Each manifest keeps the 10 latest versions.
 
-Note that a stable `X.Y.Z.0` is numerically *lower* than its own release candidates `X.Y.Z.N`.
-They are the same code, but a Jellyfin that installed `rc.2` will not be offered the stable as an
-update.
+Jellyfin compares the four-part number, so the stable release takes `.100`, above every possible
+release candidate (`.1` to `.99`): a Jellyfin that installed `rc.2` is always offered the stable
+release of the same version. For the same reason `rc.0` and `rc.100` or more are refused.
 
 ## License
 

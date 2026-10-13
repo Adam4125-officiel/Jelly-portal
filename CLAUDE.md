@@ -15,8 +15,9 @@ available to later sessions; everything binding in it is here. Repository conten
    `PluginIdentity.Id`, `build.yaml` and this file, and a test keeps all three equal.
 3. **You may create and push `-rc.N` tags. You never create a stable `vX.Y.Z` tag.** The owner
    promotes. A published tag is never deleted or moved: if an RC is broken, the fix is the next RC.
-4. **No force-push on `main`.** After the initial setup, every change is a branch (`feat/...`,
-   `fix/...`) and a PR into `main`, so CI runs.
+   GitHub now enforces this (see *Git workflow and branch protection*), so a burnt RC number stays burnt.
+4. **Everything goes through a branch (`feat/...`, `fix/...`) and a pull request.** `main` is
+   protected, with no bypass for anyone, admins included. You may merge your own PRs once CI is green.
 5. **No version number is written anywhere in the code.** It comes from the git tag and is injected
    at build time (see *Releases*).
 6. **Say what you actually verified.** Passing unit tests proved little in the sibling projects;
@@ -87,16 +88,21 @@ errors in normal cases**. UI text is French.
 the header, so use a `MutationObserver`; never create a duplicate; it must survive navigation, in
 Modern and Legacy layouts.
 
-**States, one shown at a time, by decreasing priority:**
+**States, one shown at a time, by decreasing priority (spec revised by the owner 2026-10-13):**
 
-| # | State | Look |
-|---|---|---|
-| 1 | `down` (at least one service down) | red |
-| 2 | `maintenance_ongoing` | orange with a gentle pulse, to draw the eye |
-| 3 | `degraded` | solid orange |
-| 4 | `maintenance_soon` (inside the configured window) | normal icon + **clock badge**; badge only if the maintenance touches a priority service or falls in the window |
-| 5 | `ok` | white / same colour as the other header icons (discreet) |
-| 6 | `unknown` (portal unreachable) | grey, **never red** |
+| # | State | Meaning | Look |
+|---|---|---|---|
+| 1 | Down | at least one service is down | red |
+| 2 | Maintenance in progress | a maintenance is under way | **violet**, gentle pulse (it must catch the eye) |
+| 3 | Degraded | a service is degraded | orange |
+| 4 | Maintenance soon | a maintenance is planned inside the configured window | normal icon + **clock badge** |
+| 5 | OK | all is well | discreet, same colour as the other header icons |
+| 6 | Unknown | the portal is unreachable | grey, **never red** |
+
+**Orange is reserved for Degraded.** A planned maintenance is not an outage, and it has to look
+different from one. The clock badge is shown only if the maintenance touches a priority service or
+falls inside the window. The internal state names are `down`, `maintenance_ongoing`, `degraded`,
+`maintenance_soon`, `ok`, `unknown`.
 
 **The panel is a bubble (popover), not a page.** Binding, repeated by the owner:
 
@@ -145,13 +151,19 @@ bump, conventions tests, run the real server): follow it there.
 
 ## Releases
 
-Tags: `vX.Y.Z-rc.N` (pre-release, N >= 1) or `vX.Y.Z` (stable). Anything else fails the workflow.
-Regex `^v\d+\.\d+\.\d+(-rc\.\d+)?$`; `rc.0` is also refused (it would equal the stable version).
+Tags: `vX.Y.Z-rc.N` (pre-release, **N from 1 to 99**) or `vX.Y.Z` (stable). Anything else fails the
+workflow. Regex `^v\d+\.\d+\.\d+(-rc\.\d+)?$`, plus: `rc.0` and `rc.100` or more are refused.
 
 | Tag | Jellyfin version |
 |---|---|
 | `vX.Y.Z-rc.N` | `X.Y.Z.N` |
-| `vX.Y.Z` | `X.Y.Z.0` |
+| `vX.Y.Z` | `X.Y.Z.100` |
+
+**The stable release is the highest number of its series, on purpose** (owner's decision,
+2026-10-13; the first mapping, stable = `.0`, had it *below* its own RCs, so a Jellyfin that had
+installed `rc.2` was never offered the stable). `.100` is above every possible RC (`.1`..`.99`) and
+below the next series' first candidate. Tests pin all of this; `STABLE_BUILD` in
+`tools/release_info.py` is the one definition.
 
 Jellyfin versions are four numbers with no suffix. Semver meaning: `Z` fix, `Y` feature, `X`
 breaking (a new major Jellyfin, an incompatible config change).
@@ -172,10 +184,11 @@ breaking (a new major Jellyfin, an incompatible config change).
   `.../manifest/manifest-unstable.json`.
 - `build.yaml` holds the Jellyfin packaging metadata; its `version` is the placeholder `0.0.0.0`.
   `Directory.Build.props` defaults `Version` to `0.0.0.0` for local builds only.
-  `tools/package_plugin.py` **refuses a DLL that does not contain the version it is told it has**.
-- **Known quirk, by the owner's design:** since a stable is `X.Y.Z.0` and RCs are `X.Y.Z.N`, the
-  stable of a series sorts *below* its own RCs numerically. Same code, so harmless, but a Jellyfin
-  that installed `rc.2` (`X.Y.Z.2`) will not be offered the stable `X.Y.Z.0` as an update.
+  `tools/package_plugin.py` **refuses a DLL that does not contain the version it is told it has**
+  (and a version whose last part is outside 1..100).
+- `tools/package_plugin.py` also checks the version string against the **wide, NUL-terminated**
+  resource inside the DLL with both ends anchored: a plain substring test would accept `0.1.0.1` in a
+  `0.1.0.100` build. Tested against real DLLs, not only fakes.
 - GitHub Actions run steps under `bash -e` **without** `pipefail` unless `shell: bash` is set; the
   workflows set it as a default. Keep it, or `cmd | tee` will mask failures. Pass values to scripts
   through `env:`, never inline `${{ }}` inside `run:` (a tag name is attacker-shaped input).
@@ -184,11 +197,35 @@ The owner's steps (also in the README): merge PRs on `main`; `git tag vX.Y.Z-rc.
 vX.Y.Z-rc.1`; test on production through the unstable repository; on a bug, fix and tag `rc.2`;
 when an RC is validated, the owner tags `vX.Y.Z` on that RC's commit.
 
+## Git workflow and branch protection
+
+Enabled on 2026-10-13 at the owner's request, as two GitHub **rulesets with no bypass actors**
+(admins are not exempt; editing a ruleset is the only way around them, and that is the owner's call):
+
+- **`Protect main`**: a pull request is required (**no reviews required**: the owner works alone);
+  the checks **`Build and test`**, `Client JS syntax` and `Release tooling` must pass; no force-push
+  (non-fast-forward) and no deletion. The branch does not have to be up to date with `main`.
+- **`Protect release tags`** (`refs/tags/v*`): no deletion, no update (so no moving), no force. Creating
+  a tag is allowed, and that is how a release starts. The `manifest` branch is not covered: the
+  release workflow pushes to it.
+
+Working rules that follow:
+
+- One branch at a time per topic (`feat/...`, `fix/...`), small Conventional Commits, a PR into `main`.
+  Open the PR as soon as the first push is done so CI runs. **You may merge your own PRs once the
+  three checks are green**, with a regular merge commit (`gh pr merge N --merge`), not squash or
+  rebase: the changelog is built from individual commits (`git log --no-merges`), so each small
+  commit must survive on `main`.
+- A docs-only change also takes a PR. The Status Portal repo's "docs straight to main" shortcut does
+  not exist here.
+- Tags are cut on `main` after the merge. An RC whose release workflow failed is **not** repaired by
+  deleting its tag (that is blocked); fix the cause and tag the next RC.
+- The release workflow is read from the tagged commit, so a fix to `release.yml` only takes effect
+  from the next tag.
+
 ## Project phases and gates
 
-1. **Phase 1 - repository and release machinery.** Done once the owner has approved the tree and the
-   workflows. Branch protection for `main` (required status checks: `Build and test`,
-   `Client JS syntax`, `Release tooling`) is *proposed*, never enabled without the owner's say.
+1. **Phase 1 - repository and release machinery.** Done and approved by the owner (2026-10-13).
 2. **Release test** with an empty plugin: `v0.0.1-rc.1`; check the Release, the unstable manifest,
    and that the dev Jellyfin installs it from the unstable URL.
 3. **Phase 2 - the plugin.** Clone the refs; then **propose a short plan (code structure and the

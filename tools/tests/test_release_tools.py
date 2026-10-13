@@ -47,9 +47,9 @@ def make_repo(root: Path) -> str:
 
 
 class ReleaseInfoTests(unittest.TestCase):
-    def test_stable_tag_maps_to_dot_zero(self):
+    def test_stable_tag_maps_to_dot_100(self):
         info = release_info.parse_tag("v1.2.3")
-        self.assertEqual(info["jellyfin_version"], "1.2.3.0")
+        self.assertEqual(info["jellyfin_version"], "1.2.3.100")
         self.assertFalse(info["prerelease"])
 
     def test_rc_tag_maps_to_its_number(self):
@@ -60,9 +60,33 @@ class ReleaseInfoTests(unittest.TestCase):
     def test_invalid_tags_are_rejected(self):
         for tag in ("v1.2", "1.2.3", "v1.2.3-rc", "v1.2.3-rc.", "v1.2.3-beta.1", "v1.2.3-rc.1-x",
                     "v1.2.3.4", "release-1", "v1.2.3\n", "V1.2.3", "v1.2.3-RC.1", "v1.2.3-rc.0",
-                    "v1.2.99999", "v1.2.3-rc.70000"):
+                    "v1.2.99999", "v1.2.3-rc.70000", "v1.2.3-rc.100", "v1.2.3-rc.101", "v1.2.3-rc.1000"):
             with self.subTest(tag=tag), self.assertRaises(release_info.TagError):
                 release_info.parse_tag(tag)
+
+    def test_rc_numbers_run_from_1_to_99(self):
+        self.assertEqual(release_info.parse_tag("v1.2.3-rc.1")["jellyfin_version"], "1.2.3.1")
+        self.assertEqual(release_info.parse_tag("v1.2.3-rc.99")["jellyfin_version"], "1.2.3.99")
+
+    def test_a_stable_release_outranks_every_possible_rc_of_its_series(self):
+        # What Jellyfin compares is the four-part number, not our tag order: a Jellyfin that installed
+        # any release candidate must be offered the stable release of the same version.
+        def as_tuple(tag):
+            return tuple(int(part) for part in release_info.parse_tag(tag)["jellyfin_version"].split("."))
+
+        stable = as_tuple("v1.2.3")
+        for n in range(1, 100):
+            with self.subTest(rc=n):
+                self.assertGreater(stable, as_tuple(f"v1.2.3-rc.{n}"))
+        # ...and it stays below the next series' first candidate.
+        self.assertLess(stable, as_tuple("v1.2.4-rc.1"))
+        self.assertLess(stable, as_tuple("v1.3.0-rc.1"))
+
+    def test_the_tag_order_and_the_jellyfin_order_agree(self):
+        tags = ["v0.9.0", "v1.0.0-rc.1", "v1.0.0-rc.2", "v1.0.0-rc.10", "v1.0.0-rc.99", "v1.0.0", "v1.0.1-rc.1", "v1.1.0"]
+        jellyfin = [tuple(int(p) for p in release_info.parse_tag(t)["jellyfin_version"].split(".")) for t in tags]
+        self.assertEqual(sorted(tags, key=release_info.version_key), tags)
+        self.assertEqual(sorted(jellyfin), jellyfin)
 
     def test_release_order(self):
         tags = ["v1.0.0", "v0.9.0", "v1.0.0-rc.2", "v1.0.0-rc.10", "v1.0.0-rc.1", "v1.0.1-rc.1"]
@@ -105,10 +129,15 @@ class PackageTests(unittest.TestCase):
         self.publish = self.root / "publish"
         self.publish.mkdir()
         self.dll = self.publish / "Jellyfin.Plugin.JellyPortal.dll"
-        self.dll.write_bytes(b"MZ-fake" + "0.1.0.1".encode("utf-16-le") + b"tail")
+        self.dll.write_bytes(self.fake_dll("0.1.0.1"))
 
     def tearDown(self):
         self.tmp.cleanup()
+
+    @staticmethod
+    def fake_dll(*versions):
+        # Like a real assembly: wide, NUL-terminated version strings inside the version resource.
+        return b"MZ-fake" + b"".join(b"FileVersion\x00\x00" + v.encode("utf-16-le") + b"\x00\x00" for v in versions) + b"tail"
 
     def build(self, out="out", version="0.1.0.1", timestamp="2026-01-01T00:00:00Z"):
         return package_plugin.package(self.build_yaml, self.publish, self.root / out, version, "notes", timestamp)
@@ -133,9 +162,22 @@ class PackageTests(unittest.TestCase):
         self.assertNotEqual(first, self.build("three", timestamp="2027-01-01T00:00:00Z")[1])
 
     def test_a_dll_that_ignored_the_version_is_refused(self):
-        self.dll.write_bytes(b"MZ-fake" + "0.0.0.0".encode("utf-16-le"))
+        self.dll.write_bytes(self.fake_dll("0.0.0.0"))
         with self.assertRaises(package_plugin.PackageError):
             self.build()
+
+    def test_a_version_that_only_looks_like_the_real_one_is_refused(self):
+        # The stable build number .100 starts with .1 and rc numbers 1..9 are prefixes of 10..99.
+        for built, claimed in (("0.1.0.100", "0.1.0.1"), ("0.1.0.10", "0.1.0.1"), ("10.1.0.1", "0.1.0.1"), ("0.1.0.1", "0.1.0.10")):
+            with self.subTest(built=built, claimed=claimed):
+                self.dll.write_bytes(self.fake_dll(built))
+                with self.assertRaises(package_plugin.PackageError):
+                    self.build(version=claimed)
+
+    def test_a_stable_version_is_packaged(self):
+        self.dll.write_bytes(self.fake_dll("0.1.0.100"))
+        path, _ = self.build(version="0.1.0.100")
+        self.assertEqual(path.name, "jelly-portal_0.1.0.100.zip")
 
     def test_a_missing_artifact_is_refused(self):
         self.dll.unlink()
@@ -143,7 +185,7 @@ class PackageTests(unittest.TestCase):
             self.build()
 
     def test_a_malformed_version_is_refused(self):
-        for version in ("0.1.0", "0.1.0-rc.1", "v0.1.0.1", "0.1.0.1.2"):
+        for version in ("0.1.0", "0.1.0-rc.1", "v0.1.0.1", "0.1.0.1.2", "0.1.0.0", "0.1.0.101"):
             with self.subTest(version=version), self.assertRaises(package_plugin.PackageError):
                 self.build(version=version)
 
@@ -184,9 +226,10 @@ class ManifestTests(unittest.TestCase):
 
     def test_a_stable_release_reaches_both(self):
         self.release("0.1.0.1", prerelease=True)
-        self.release("0.1.0.0", prerelease=False)
-        self.assertEqual(self.versions(self.stable), ["0.1.0.0"])
-        self.assertEqual(self.versions(self.unstable), ["0.1.0.1", "0.1.0.0"])
+        self.release("0.1.0.100", prerelease=False)
+        self.assertEqual(self.versions(self.stable), ["0.1.0.100"])
+        # Newest first: the stable release outranks the RC it was promoted from.
+        self.assertEqual(self.versions(self.unstable), ["0.1.0.100", "0.1.0.1"])
 
     def test_entry_shape(self):
         self.release("0.1.0.1", prerelease=True)
