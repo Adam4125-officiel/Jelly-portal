@@ -56,4 +56,19 @@ public class PluginIdentityTests
         Assert.Contains($"Include=\"Jellyfin.Controller\" Version=\"{packageVersion}\"", csproj);
         Assert.Contains($"Include=\"Jellyfin.Model\" Version=\"{packageVersion}\"", csproj);
     }
+
+    [Fact]
+    public void ClaudeMdRecordsTheGuid()
+    {
+        // Future sessions rely on CLAUDE.md to know the GUID is frozen.
+        Assert.Contains(PluginIdentity.Id, RepoFiles.Read("CLAUDE.md"));
+    }
+
+    [Fact]
+    public void ReadmeAdvertisesBothManifestUrls()
+    {
+        var readme = RepoFiles.Read("README.md");
+        Assert.Contains("https://raw.githubusercontent.com/Adam4125-officiel/Jelly-portal/manifest/manifest.json", readme);
+        Assert.Contains("https://raw.githubusercontent.com/Adam4125-officiel/Jelly-portal/manifest/manifest-unstable.json", readme);
+    }
 }
