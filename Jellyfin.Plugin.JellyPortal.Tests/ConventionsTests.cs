@@ -50,8 +50,10 @@ public class ConventionsTests
         // The owner reads the browser console to diagnose; a message without the prefix cannot be told from Jellyfin's own.
         var calls = new Regex(@"console\.\w+\(");
         var prefixed = new Regex(@"console\.\w+\(\s*['""`]\[JellyPortal\]");
-        var files = Directory.GetFiles(Path.Combine(RepoFiles.Root, "Jellyfin.Plugin.JellyPortal", "Web"), "*.js", SearchOption.AllDirectories);
-        Assert.NotEmpty(files);
+        var files = Directory.GetFiles(Path.Combine(RepoFiles.Root, "Jellyfin.Plugin.JellyPortal", "Web"), "*.js", SearchOption.AllDirectories)
+            .Append(Path.Combine(RepoFiles.Root, "Jellyfin.Plugin.JellyPortal", "Configuration", "configPage.html"))
+            .ToArray();
+        Assert.True(files.Length >= 2);
         foreach (var file in files)
         {
             var text = File.ReadAllText(file);

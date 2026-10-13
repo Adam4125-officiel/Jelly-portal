@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <title>Jelly Portal</title>
+</head>
+<body>
+    <div id="JellyPortalConfigPage" data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-input,emby-button,emby-select,emby-checkbox">
+        <div data-role="content">
+            <div class="content-primary">
+                <h2 class="sectionTitle">Jelly Portal</h2>
+                <p class="fieldDescription">
+                    Affiche dans l'en-tête du client web l'état de vos services, tel que le rapporte votre status portal.
+                    Les modifications s'appliquent immédiatement, sans redémarrer Jellyfin.
+                </p>
+
+                <div id="jpFileTransformation" class="fieldDescription" role="status" style="margin-bottom: 1.5em;"></div>
+
+                <form id="jpForm" autocomplete="off">
+                    <h3 class="sectionTitle">Status portal</h3>
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="jpPortalUrl">Adresse du portal</label>
+                        <input id="jpPortalUrl" name="portalUrl" type="text" is="emby-input" placeholder="http://192.168.1.10:5000" />
+                        <div class="fieldDescription">L'adresse que le serveur Jellyfin utilise pour joindre le portal (pas forcément celle de votre navigateur). Sans identifiant ni paramètres.</div>
+                    </div>
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="jpApiKey">Clé de l'API « Display device » du portal</label>
+                        <input id="jpApiKey" name="apiKey" type="password" is="emby-input" autocomplete="new-password" />
+                        <div class="fieldDescription" id="jpApiKeyHint">Dans l'administration du portal : page Display device. La clé reste sur le serveur et n'est jamais envoyée à un navigateur.</div>
+                        <button id="jpClearKey" is="emby-button" type="button" class="raised emby-button hide" style="margin-top: 0.5em;"><span>Effacer la clé enregistrée</span></button>
+                    </div>
+                    <div>
+                        <button id="jpTest" is="emby-button" type="button" class="raised emby-button"><span>Tester la connexion</span></button>
+                        <div id="jpTestResult" class="fieldDescription" role="status" style="margin-top: 0.75em;"></div>
+                    </div>
+
+                    <h3 class="sectionTitle" style="margin-top: 2em;">Affichage</h3>
+                    <div class="selectContainer">
+                        <label class="selectLabel" for="jpAdminsOnly">Visible par</label>
+                        <select is="emby-select" id="jpAdminsOnly" name="adminsOnly" class="emby-select-withcolor emby-select">
+                            <option value="false">Tous les utilisateurs</option>
+                            <option value="true">Les administrateurs seulement</option>
+                        </select>
+                    </div>
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="jpPriority">Services prioritaires</label>
+                        <textarea id="jpPriority" name="priorityServices" is="emby-textarea" rows="4" class="emby-textarea" style="width: 100%;" placeholder="Jellyfin"></textarea>
+                        <div class="fieldDescription">Un nom par ligne, tel qu'il s'écrit dans le portal (majuscules sans importance). Leurs maintenances et incidents sont mis en avant dans la bulle.</div>
+                    </div>
+
+                    <h3 class="sectionTitle" style="margin-top: 2em;">Actualisation</h3>
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="jpSoon">Fenêtre « maintenance à venir » (heures)</label>
+                        <input id="jpSoon" name="soonWindowHours" type="number" is="emby-input" />
+                        <div class="fieldDescription" id="jpSoonHint">Une maintenance prévue dans cette fenêtre fait apparaître le badge horloge.</div>
+                    </div>
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="jpPoll">Actualisation dans le navigateur (secondes)</label>
+                        <input id="jpPoll" name="pollSeconds" type="number" is="emby-input" />
+                        <div class="fieldDescription" id="jpPollHint">Un onglet masqué n'interroge pas le serveur.</div>
+                    </div>
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="jpCache">Durée du cache serveur (secondes)</label>
+                        <input id="jpCache" name="cacheSeconds" type="number" is="emby-input" />
+                        <div class="fieldDescription" id="jpCacheHint">Quel que soit le nombre de navigateurs ouverts, le portal n'est interrogé qu'une fois par cette durée.</div>
+                    </div>
+
+                    <div style="margin-top: 2em;">
+                        <button is="emby-button" type="submit" class="raised button-submit block emby-button"><span>Enregistrer</span></button>
+                        <div id="jpSaveResult" class="fieldDescription" role="status" style="margin-top: 0.75em;"></div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <script type="text/javascript">
+            (function () {
+                'use strict';
+
+                var page = document.querySelector('#JellyPortalConfigPage');
+                var $ = function (id) { return page.querySelector('#' + id); };
+                var clearKey = false;
+
+                // Same endpoints for everything: the generic plugin-configuration API is deliberately not used, because
+                // it would hand the portal API key to this page, and posting the whole object back would erase it.
+                function call(method, path, body) {
+                    return ApiClient.ajax({
+                        type: method,
+                        url: ApiClient.getUrl('JellyPortal/' + path),
+                        data: body ? JSON.stringify(body) : undefined,
+                        contentType: 'application/json',
+                        dataType: 'json'
+                    });
+                }
+
+                function say(id, text, bad) {
+                    var el = $(id);
+                    el.textContent = text || '';
+                    el.style.color = bad ? '#e57373' : '';
+                }
+
+                function fileTransformationText(code) {
+                    switch (code) {
+                        case 'registered': return ['File Transformation est installé : l\'icône sera ajoutée à l\'en-tête du client web.', false];
+                        case 'not_installed': return ['File Transformation n\'est pas installé : sans lui, l\'icône ne peut pas être ajoutée à l\'en-tête. Installez-le depuis le catalogue (dépôt https://www.iamparadox.dev/jellyfin/plugins/manifest.json) puis redémarrez Jellyfin.', true];
+                        case 'incompatible': return ['La version de File Transformation installée n\'est pas prise en charge : l\'icône ne peut pas être ajoutée. Installez la version 3.x correspondant à votre Jellyfin.', true];
+                        case 'failed': return ['File Transformation a refusé l\'enregistrement : l\'icône ne peut pas être ajoutée. Voir le journal du serveur (lignes [JellyPortal]).', true];
+                        default: return ['État de File Transformation inconnu pour le moment.', false];
+                    }
+                }
+
+                function fill(config) {
+                    $('jpPortalUrl').value = config.portalUrl || '';
+                    $('jpApiKey').value = '';
+                    $('jpApiKey').placeholder = config.hasApiKey ? '•••••••• (clé enregistrée, laissez vide pour la conserver)' : '';
+                    $('jpClearKey').classList.toggle('hide', !config.hasApiKey);
+                    clearKey = false;
+                    $('jpAdminsOnly').value = config.adminsOnly ? 'true' : 'false';
+                    $('jpPriority').value = config.priorityServices || '';
+                    var ranges = config.ranges || {};
+                    [['jpSoon', 'soonWindowHours', config.soonWindowHours], ['jpPoll', 'pollSeconds', config.pollSeconds], ['jpCache', 'cacheSeconds', config.cacheSeconds]].forEach(function (row) {
+                        var input = $(row[0]);
+                        var range = ranges[row[1]];
+                        input.value = row[2];
+                        if (range) {
+                            input.min = range.min;
+                            input.max = range.max;
+                            input.placeholder = String(range['default']);
+                        }
+                    });
+                    var ft = fileTransformationText(config.fileTransformation);
+                    say('jpFileTransformation', ft[0], ft[1]);
+                }
+
+                function form() {
+                    var number = function (id) {
+                        var raw = $(id).value.trim();
+                        return raw === '' ? null : Number(raw);
+                    };
+                    return {
+                        portalUrl: $('jpPortalUrl').value.trim(),
+                        apiKey: $('jpApiKey').value.trim() || null,
+                        clearApiKey: clearKey,
+                        adminsOnly: $('jpAdminsOnly').value === 'true',
+                        priorityServices: $('jpPriority').value,
+                        soonWindowHours: number('jpSoon'),
+                        pollSeconds: number('jpPoll'),
+                        cacheSeconds: number('jpCache')
+                    };
+                }
+
+                function failure(error, target) {
+                    var fallback = 'Une erreur est survenue (voir la console du navigateur).';
+                    if (error && typeof error.json === 'function') {
+                        error.json().then(function (body) { say(target, (body && body.error) || fallback, true); }, function () { say(target, fallback, true); });
+                    } else {
+                        say(target, fallback, true);
+                    }
+                    // A refused value (HTTP 400) is a normal answer, already shown in words; only a real failure is logged.
+                    if (!(error && error.status === 400)) {
+                        console.error('[JellyPortal] settings request failed', error);
+                    }
+                }
+
+                page.addEventListener('pageshow', function () {
+                    say('jpSaveResult', '');
+                    say('jpTestResult', '');
+                    Dashboard.showLoadingMsg();
+                    call('GET', 'Config').then(fill, function (e) { failure(e, 'jpSaveResult'); }).then(Dashboard.hideLoadingMsg, Dashboard.hideLoadingMsg);
+                });
+
+                $('jpClearKey').addEventListener('click', function () {
+                    clearKey = true;
+                    $('jpApiKey').value = '';
+                    $('jpApiKey').placeholder = 'La clé sera effacée à l\'enregistrement.';
+                });
+
+                $('jpTest').addEventListener('click', function () {
+                    say('jpTestResult', 'Test en cours…');
+                    call('POST', 'Config/Test', form()).then(function (result) {
+                        say('jpTestResult', result.message, !result.ok);
+                    }, function (e) { failure(e, 'jpTestResult'); });
+                });
+
+                $('jpForm').addEventListener('submit', function (event) {
+                    event.preventDefault();
+                    say('jpSaveResult', '');
+                    Dashboard.showLoadingMsg();
+                    call('POST', 'Config', form()).then(function (config) {
+                        fill(config);
+                        say('jpSaveResult', 'Enregistré.');
+                    }, function (e) { failure(e, 'jpSaveResult'); }).then(Dashboard.hideLoadingMsg, Dashboard.hideLoadingMsg);
+                    return false;
+                });
+            })();
+        </script>
+    </div>
+</body>
+</html>
