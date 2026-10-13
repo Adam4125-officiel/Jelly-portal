@@ -116,38 +116,101 @@ falls inside the window. The internal state names are `down`, `maintenance_ongoi
 - No clash with the header's other popovers: opening one closes the other if that can be done
   cleanly; otherwise at the very least no broken overlap.
 - **The only real page of this plugin is its configuration in the admin dashboard.**
-- Content: services with a state dot, ongoing maintenance (time remaining), upcoming maintenance
-  (readable countdown such as "dans 3 h"), active announcements, an "Ouvrir le status portal" link.
+- Content, in this order: services with a state dot (worst first, as the portal sends them); **open
+  incidents ("Incidents en cours") right after the services that are down** (title, status
+  investigating / identified / monitoring, since when, services concerned); maintenance in progress
+  (time remaining); upcoming maintenance (readable countdown such as "dans 3 h"), priority ones first
+  and highlighted; active announcements; an "Ouvrir le status portal" link.
+- **Times are shown in the browser's local time zone, in French**: "aujourd'hui \u00e0 22:00",
+  "demain \u00e0 03:00", "dans 3 h", "se termine dans 45 min". The JSON stays UTC with a `Z`; the
+  conversion is client-side, after correcting the browser's clock skew with `SummaryDto.now`. A test
+  covers it across both daylight-saving changes (the formatter takes the time zone as a parameter so it
+  can be tested in any zone).
 - Style consistent with Jellyfin's dark theme, using the 12.x theme CSS variables where they exist.
 
 **Polling** uses the configured interval, **pauses while the tab is hidden** (`visibilitychange`)
 and refreshes immediately when the tab returns.
 
-## Server behaviour (specified by the owner)
+## Server behaviour (specified by the owner, refined 2026-10-13)
 
-1. **Admin config page** (dashboard): status portal URL; optional API key (**stored server-side,
-   never sent to the browser**); client polling interval (default 60 s); server cache TTL (default
-   30 s); "upcoming maintenance" window (default 24 h); list of "priority" services (for example
-   Jellyfin) whose maintenance must stand out; visibility (all users / admins only).
-2. `GET /JellyPortal/Summary`, `[Authorize]` (any signed-in Jellyfin user). Queries the portal
-   **server-side**, caches for the TTL (N browsers = one request to the portal) and returns
-   normalised JSON: computed global state, services, ongoing and upcoming maintenance, active
-   announcements, timestamp. The JSON format is agreed with the owner before coding (phase 2 plan).
-3. An endpoint that serves the client JS/CSS, registered with File Transformation for injection
-   into `index.html`.
-4. Portal unreachable or timing out -> state `unknown` in the JSON. No exception, no red state.
+1. **Admin config page** (dashboard): status portal URL; **the portal's display-device API key
+   (required)**, stored server-side and never sent to a browser; client polling interval (default
+   60 s); server cache TTL (default 30 s); "maintenance coming up" window (default 24 h, 1 h to 30
+   days); priority services (by name, one per line, case-insensitive); visibility (all users / admins
+   only). Without a URL or key the state is `unknown` with `reason: not_configured`, and the config
+   page says what is wrong in words.
+2. `GET /JellyPortal/Summary`, `[Authorize]` (any signed-in Jellyfin user; `403` for a non-admin when
+   visibility is "admins only", and the client then does nothing). Queries the portal **server-side**,
+   caches the *raw reading* for the TTL (N browsers = one request to the portal; a failure is cached
+   for the same time so a dead portal costs one timeout per TTL, not one per browser) and **recomputes
+   the state on every request** against the portal's clock, so a window that starts between two
+   readings turns "soon" into "in progress" on time. Returns `SummaryDto` (`Summary/SummaryDto.cs`:
+   every property has an explicit JSON name, because the host's JSON options are PascalCase and could
+   change). It never returns a 5xx for a portal problem.
+3. An endpoint that serves the client JS/CSS (`[AllowAnonymous]`: the script has to load before
+   sign-in, and it carries no data), registered with File Transformation for injection into
+   `index.html`.
+4. Portal unreachable, slow, refusing or answering nonsense -> state `unknown` with a `reason` code,
+   never an exception and never red. Codes: `not_configured`, `device_api_disabled` (portal answered
+   404), `bad_api_key` (401), `unreachable`, `timeout`, `bad_response`, `portal_outdated` (answered
+   without `"detail":"full"`: a portal before 1.12.0). Only the code leaves the server; the exception
+   text, which can name internal addresses, stays in the log.
 
-The global state is computed by **pure code with no Jellyfin dependency**, so it is unit-tested
-(every priority above, including combined cases) in `Jellyfin.Plugin.JellyPortal.Tests`.
+### Data source: the portal's display-device API, with `detail=full`
+
+The plugin reads `GET <portal>/api/device/summary` with the key in the **`X-Api-Key` header only**,
+asking for **exactly** `?sections=services,incidents,maintenance,announcements&services=all&detail=full`.
+**Never** `resources`, `vms` or `jellyfin=1`: that API is not subject to the portal's public-visibility
+switches, and this plugin shows its data to every Jellyfin user, so those would expose the inside of
+the server. `detail=full` (portal 1.12.0, `device_api.py`) lifts the screen-sized limits and adds the
+`service_names` arrays and the maintenance `description`; the contract is the portal's, and
+`DevicePayloadParser` reads exactly it. The parser is strict about shape and tolerant of extras.
+
+Decisions made with the owner, which the code and tests encode (change them only on his word):
+
+- **The plugin computes its own state**, with the priority of the table above. It does not use the
+  portal's `overall`: the portal ranks degraded above maintenance, this plugin does not.
+- **An open incident counts as at least `degraded`**, even with no service marked down (a hand-made
+  incident must show). A `down` service still wins, and so does a maintenance in progress, by the table.
+- **In progress** = the portal's `state == "active"` **or** the clock is between `starts` and `ends`
+  (the portal's flag only flips on its next check cycle). A window past its end but still flagged
+  active is still in progress. A service set to `maintenance` by hand with no window counts too, with no
+  time left to show.
+- **Clock:** the portal's `now` is the reference. The estimate is `now + time elapsed here since the
+  reading`; this machine's absolute clock is never compared with a portal time. `SummaryDto.now` carries
+  it so the browser can correct its own skew.
+- **Services the admin excluded from the portal's overall status** are absent from its services list
+  but not from its windows and incidents. A window or incident naming only services missing from a
+  *complete* list is shown in the panel but does not change the icon; if the list was cut (`total` above
+  the items sent) nothing is inferred.
+- **Priority services** (by name) only put a maintenance or incident forward in the panel (first,
+  highlighted). The badge follows the configured window for every service: priority never widens it.
+- `slow` and unrecognised statuses are OK for the icon (neutral dot in the panel). Announcements never
+  change the icon. A manual maintenance, a window and an incident are all shown in the panel.
+- Announcement and maintenance text is plain text for the browser (`textContent`), never HTML.
+
+The global state and the panel content come from **pure code with no Jellyfin dependency**
+(`Jellyfin.Plugin.JellyPortal/Summary/`), unit-tested in `Jellyfin.Plugin.JellyPortal.Tests`, which
+include the 64 combinations of conditions against the table; a convention test keeps that folder free
+of Jellyfin/ASP.NET references.
 
 ## The status portal side (a different repository)
 
-Work on the portal is done in **its** repository, not here, and shown to the owner as a **separate
-diff**. First check what it already exposes: it has a public `/api/status` (its key set is pinned by
-a test and external dashboards read it) and a keyed `/api/device/summary` for the Status-ESP display.
-Add or extend a **read-only** `/api/summary` only if those are insufficient, **without breaking
-anything that already uses them**. The portal has its own strict `CLAUDE.md` (branch + PR, version
-bump, conventions tests, run the real server): follow it there.
+The portal is `Adam4125-officiel/Status-Portal` (Flask + SQLite; a sibling clone exists on the dev VM).
+Work on it happens in **its** repository, on a branch, with a draft PR that **the owner reviews and
+merges himself**; nothing is merged there without his word. It has its own strict `CLAUDE.md`
+(branch + PR, version bump, convention tests, run the real server): follow it there.
+
+- The owner decided the data source is its machine-to-machine **display-device API**
+  (`/api/device/summary`, keyed, versioned, `now`, UTC with `Z`, open incidents only, excluded services
+  already left out), not the public `/api/status`.
+- Its limits were cut for an ESP8266 display, so the portal got an **opt-in `detail=full`** parameter
+  (portal 1.12.0): without it the answer is byte-for-byte what 1.11.1 sent (pinned by a golden test
+  there), with it the limits are generous but bounded, services of incidents and windows come as name
+  arrays and windows carry their description. The answer says `"detail":"full"` so a plugin can tell a
+  portal that honoured it from an older one.
+- The fixtures in `Jellyfin.Plugin.JellyPortal.Tests/Fixtures/` are real answers produced by the
+  portal's own code; the fake portal in `dev/` must keep honouring exactly that contract.
 
 ## Releases
 
@@ -226,13 +289,21 @@ Working rules that follow:
 ## Project phases and gates
 
 1. **Phase 1 - repository and release machinery.** Done and approved by the owner (2026-10-13).
-2. **Release test** with an empty plugin: `v0.0.1-rc.1`; check the Release, the unstable manifest,
-   and that the dev Jellyfin installs it from the unstable URL.
-3. **Phase 2 - the plugin.** Clone the refs; then **propose a short plan (code structure and the
-   exact `/JellyPortal/Summary` JSON) and wait for the owner's validation before coding**. After that,
-   work autonomously with the test loop. Deliver: features merged via PR, README (installation,
-   configuration, screenshots), the portal diff apart, a `v0.1.0-rc.1` released by the workflow
-   (never a stable), and a final summary of what works, what was tested and the known limits.
+2. **Release test** with an empty plugin: done 2026-10-13 (`v0.0.1-rc.1` = Jellyfin `0.0.1.1`; the
+   Release, the unstable manifest entry and its MD5 were checked, and a Dockerised Jellyfin 12.2.0 with
+   File Transformation 3.0.2.0 installed and loaded it from the unstable URL with no ABI warning).
+3. **Phase 2 - the plugin.** Plan validated by the owner on 2026-10-13. Order of work:
+   1. the portal's `detail=full` PR (draft, owner reviews and merges; he then installs a portal RC on
+      his production through the portal's updater);
+   2. meanwhile, plugin PRs that do not depend on it, built against a **fake portal that honours exactly
+      the contract of that PR**: pure logic, client + endpoint, config page, injection, bubble;
+   3. once the portal is merged and its RC is running at the owner's, point the real client at the
+      real portal;
+   4. `v0.1.0-rc.1` (never a stable) and a final report: Playwright screenshots of every state with
+      the bubble open, Modern and Legacy layouts, desktop and mobile; what was and was not tested;
+      known limits.
+   **A real blocker, notably the File Transformation registration by reflection, means stopping and
+   asking the owner, not working around it.**
 
 ## Dev loop and tests (mandatory in phase 2)
 
