@@ -1,1 +1,20 @@
-[]
+[
+  {
+    "guid": "a72a6bca-0bfe-480c-946f-e0a3fcb2c746",
+    "name": "Jelly Portal",
+    "description": "Adds a permanent icon to the header of the Jellyfin web client that reflects the overall state of your self-hosted services as reported by your status portal (up, degraded, down, maintenance in progress or coming up). Clicking it opens a panel with the details: services, maintenance windows and announcements. Requires the File Transformation plugin.",
+    "overview": "Shows your status portal's state as an icon in the Jellyfin web header.",
+    "owner": "Adam4125-officiel",
+    "category": "General",
+    "versions": [
+      {
+        "version": "0.0.1.1",
+        "changelog": "### Features\n- release: map a stable tag to X.Y.Z.100 so it outranks its release candidates (2047fe7)\n- add the empty plugin skeleton and its test project (cdf5f10)\n\n### Other changes\n- record the PR-only workflow and what the main/tag rulesets enforce (e98879c)\n- make \"maintenance in progress\" violet and reserve orange for degraded (2a5a157)\n- explain the new version mapping and drop the stable-below-RC note (adbdcc2)\n- add CLAUDE.md and complete the README (3b54784)\n- Initial commit (76eaa52)",
+        "targetAbi": "12.2.0.0",
+        "sourceUrl": "https://github.com/Adam4125-officiel/Jelly-portal/releases/download/v0.0.1-rc.1/jelly-portal_0.0.1.1.zip",
+        "checksum": "E7309E4B524C448D04F6B418E8189D52",
+        "timestamp": "2026-10-13T20:37:41Z"
+      }
+    ]
+  }
+]
