@@ -43,4 +43,21 @@ public class ConventionsTests
             Assert.False(model.IsMatch(File.ReadAllText(file)), $"{file} mentions a model name");
         }
     }
+
+    [Fact]
+    public void EveryConsoleCallOfTheClientScriptCarriesThePrefix()
+    {
+        // The owner reads the browser console to diagnose; a message without the prefix cannot be told from Jellyfin's own.
+        var calls = new Regex(@"console\.\w+\(");
+        var prefixed = new Regex(@"console\.\w+\(\s*['""`]\[JellyPortal\]");
+        var files = Directory.GetFiles(Path.Combine(RepoFiles.Root, "Jellyfin.Plugin.JellyPortal", "Web"), "*.js", SearchOption.AllDirectories);
+        Assert.NotEmpty(files);
+        foreach (var file in files)
+        {
+            var text = File.ReadAllText(file);
+            Assert.True(
+                calls.Matches(text).Count == prefixed.Matches(text).Count,
+                $"{Path.GetFileName(file)} has a console call whose first argument does not start with '[JellyPortal]'.");
+        }
+    }
 }
