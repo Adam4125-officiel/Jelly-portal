@@ -51,17 +51,28 @@ polling is enough.
   when the server version is lower than `targetAbi`).
 - **Client code is injected with File Transformation (IAmParadox27), 3.0.x.** It publishes a
   `Release-12.2.0.zip` (3.0.2.0, 2026-10-12) in its own manifest
-  `https://www.iamparadox.dev/jellyfin/plugins/manifest.json`. Its README says it cannot be
-  referenced as a library (plugins load into different load contexts), so registration is by
-  **reflection**: find the assembly whose name contains `.FileTransformation`, get type
-  `Jellyfin.Plugin.FileTransformation.PluginInterface`, call static `RegisterTransformation` with a
-  payload (`id`, `fileNamePattern`, then either `callbackAssembly`/`callbackClass`/`callbackMethod`
-  or a `transformationEndpoint`). The callback receives `{ "contents": "..." }` and returns the new
-  file contents. `jellyfin-plugin-home-sections` (in `refs/`) is a working example on 12.x. Mind that
-  the payload type crosses load contexts: do not assume a `JObject` built in this plugin's context
-  is the same type File Transformation expects; check the example and test it for real.
-  **If File Transformation is absent the plugin must still start and log a clear warning; it must
-  never crash Jellyfin.**
+  `https://www.iamparadox.dev/jellyfin/plugins/manifest.json`. It cannot be referenced as a library (plugins
+  load into different load contexts), so `Injection/FileTransformationBridge` registers by **reflection**, and
+  this was run against the real 3.0.2.0 on Jellyfin 12.2, not only against a stand-in. What was learned reading
+  its source and confirmed live:
+  - The bridge finds the assembly that has `Jellyfin.Plugin.FileTransformation.PluginInterface` (by the type,
+    in every load context), then builds the payload **with that method's own parameter type**
+    (`JObject.Parse(json)` through reflection): no compile-time Newtonsoft reference and no assumption about
+    which copy of it File Transformation loaded. The callback is `IndexHtmlTransformation.Apply(
+    TransformationPayload)`; File Transformation builds the parameter with `JObject{"contents":...}.ToObject(type)`
+    (so the property must be called `Contents`) and takes the returned string as the new file.
+  - **The registration key must be the literal `index.html`, the same as the other plugins that patch that
+    file (Home Sections, ...).** File Transformation keeps one list of transformations per exact key and, for a
+    file whose name equals a key, runs *only that list*; with any other pattern string (an "anchored regex"
+    looks tidier) it picks the first matching key, so either this plugin or the others would silently not run.
+    `FilePattern` is pinned by a test. Registering the same id twice is ignored by File Transformation.
+  - The injected addresses are **relative** (`../JellyPortal/client.js?v=<version>`), so a Jellyfin served under
+    a base URL still works. The assets (`client.js`, `client.css`) are `[AllowAnonymous]` (the page loads
+    before sign-in; they carry no data), looked up by exact name from embedded resources (nothing is joined to a
+    path), with an `ETag` and `no-cache` so a browser revalidates with a 304.
+  - **If File Transformation is absent the plugin starts, logs one clear `[JellyPortal]` warning and does
+    nothing else; the same for an incompatible or failing File Transformation. Verified live: Jellyfin
+    `Healthy`, plugin `Active`, no error, API still answering.**
 - **Never modify jellyfin-web's files directly.**
 - Before using any Jellyfin API, confirm it exists in `refs/jellyfin` at tag `v12.2`. Jellyfin's
   stated policy is that an endpoint absent from its OpenAPI spec must not be used by clients.
