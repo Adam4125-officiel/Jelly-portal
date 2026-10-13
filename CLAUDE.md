@@ -142,6 +142,45 @@ falls inside the window. The internal state names are `down`, `maintenance_ongoi
 **Polling** uses the configured interval, **pauses while the tab is hidden** (`visibilitychange`)
 and refreshes immediately when the tab returns.
 
+### How the client is built (and why)
+
+One script and one stylesheet, embedded in the plugin: `Web/jellyportal.js` (IIFE, no framework, no external
+load: a test forbids `@import`, `url(` and any other host) and `Web/jellyportal.css`. Its pure helpers
+(durations, local times, clock skew, bubble placement, French wording) are exported when it is loaded as a
+CommonJS module, and tested with Node's own runner: `node --test client-tests/*.test.js` (CI runs it in the
+`Client JS syntax` job). The DOM part is covered by the end-to-end scripts in `dev/e2e/`.
+
+- **Where the icon goes, read from the real DOM** of `refs/jellyfin-web` v12.2 and confirmed live. *Modern*
+  (the default, `layout` unset or `modern` in `localStorage`): `header.MuiAppBar-root > .MuiToolbar-root` holds
+  `[left stack][Box of buttons][Box with the user menu]`; the icon is the **first** button of the middle Box,
+  found from the user menu's `.MuiAvatar-root` (aria labels are translated, the structure is not). *Legacy*
+  (`desktop-legacy`, `mobile-legacy`): `.skinHeader .headerRight`, first. The legacy `.skinHeader` also exists,
+  hidden, in Modern, which is why Modern is looked for first. `localStorage.layout` is how a test selects one.
+- **A `MutationObserver` on the body re-runs one idempotent `ensureIcon()`** (throttled with
+  `requestAnimationFrame`): one icon, in the right place, rebuilt if the header was re-rendered or the layout
+  changed, removed when there is no header (login page, video player) or the user is not signed in.
+- **Authentication and errors**: `window.ApiClient.ajax` (the page's own token). 401 removes the icon; **403
+  (administrators only) stops everything for that page and logs nothing**; any other failure shows the grey
+  state with "Impossible de contacter le serveur Jellyfin" and keeps polling.
+- **Polling**: the interval is the summary's `pollSeconds` (at least 10 s), one request at a time, none while
+  the tab is hidden, an immediate refresh when it comes back.
+- **The bubble**: `position: fixed`, `z-index: var(--jf-zIndex-drawer)` (1200: above the app bar at 1100, below
+  menus and dialogs at 1300), 360 px wide on a desktop and the screen minus 16 px below 600 px, at most 70 % of
+  the screen high with its own scroll, an arrow on the icon's centre, right-aligned to the icon. It closes on a
+  `pointerdown` outside it and the icon (capture phase: this is also how it gives way to Jellyfin's own header
+  menus, whose opening is a click outside it), on Escape (focus returns to the icon), on a click on the icon, and
+  on `hashchange`/`popstate`. It never navigates and the URL never changes. Healthy services beyond six are
+  folded behind one line so that incidents and maintenance are not buried under a long list of green dots.
+- **Colours** come from Jellyfin's `--jf-palette-*` variables with a fallback each; violet (not in the palette)
+  is `--jellyportal-violet` (`#b388ff`). Orange is only ever "degraded". The pulse of "maintenance in progress"
+  stops under `prefers-reduced-motion`.
+- **Logging**: every `console` call starts with the literal `'[JellyPortal]'` (checked by a test, which is why
+  there is no `LOG` constant). No `innerHTML` and nothing built from server text but `textContent` (tested).
+  The client and the server are tied by tests: the states and failure reasons the client words are exactly the
+  ones the server can send.
+- **Dev builds are not cached by the browser between rebuilds** (`no-cache` + ETag), but the `?v=` is the plugin
+  version, so every dev build is `0.0.0.1`: hard-reload if a stale script is suspected.
+
 ## Server behaviour (specified by the owner, refined 2026-10-13)
 
 1. **Admin config page** (dashboard): status portal URL; **the portal's display-device API key
@@ -310,6 +349,60 @@ Working rules that follow:
   deleting its tag (that is blocked); fix the cause and tag the next RC.
 - The release workflow is read from the tagged commit, so a fix to `release.yml` only takes effect
   from the next tag.
+
+## Handoff: where the work stands and where to pick it up (written 2026-10-14, ~03:00 CEST)
+
+Read the rest of this file first; this section is only the state of play. The owner talks French; this repo is English.
+
+**On `main` (merged, CI green):** PR #1 (stable = `X.Y.Z.100`, violet maintenance), #2 (pure `Summary/` logic), #3 (portal
+client, cache, `GET /JellyPortal/Summary`, strict fake portal, dev loop), #4 (File Transformation injection), #5 (settings page).
+`v0.0.1-rc.1` (= Jellyfin `0.0.1.1`) was released and installed from the unstable URL on the dev Jellyfin as the release test.
+
+**This PR (#6, branch `feat/client-icon-bubble`): the client itself** (icon + bubble + polling), its Node tests
+(`client-tests/`), the browser end-to-end scripts (`dev/e2e/`) and the README images (`docs/images/`). It was verified live:
+`dev/e2e/bubble.py` **1644 checks, 0 failures** (16 scenarios x Modern/Legacy x desktop/phone: icon state and colour, pulse only
+for maintenance in progress, clock badge only for "soon", bubble geometry, URL unchanged, close by outside click / Escape / icon,
+text per scenario, incident order, no console error of ours, no grey flash before the first answer, colour kept while pressed),
+`dev/e2e/behaviour.py` **55 of 56** (the one failure was the Tokyo time-zone check, a flaw in the *test*: the fake portal moves a
+"two hours from now" start by a minute between two requests; fixed with a +-1 min tolerance and **not re-run**), 26 Node tests
+(daylight saving included), 330 C# tests, 22+13 Python tests. Seven+ mutations of each layer were shown to fail the suite.
+**Next action: `gh pr view 6`, wait for CI, then `gh pr ready 6 && gh pr merge 6 --merge --delete-branch`.**
+
+**Then, in order:**
+1. **The portal side is the owner's to merge**: `Adam4125-officiel/Status-Portal` **PR #29** (draft, branch `1.12.0`, `VERSION`
+   `1.12.0-rc.1`, adds the opt-in `detail=full` to `/api/device/summary`; default answer byte-identical, pinned by a golden test).
+   It was written by a Sonnet subagent and re-verified by me (full portal suite re-run: 1589 passed). **Do not merge it and do not
+   tag it**: the owner reviews, merges, tags the portal RC and updates his production through the portal's updater (unstable
+   channel). A local worktree `/home/adrrrr/Status-Portal-1.12.0` holds that branch (remove with `git worktree remove` once merged).
+2. **Only when the owner says the portal RC runs at his place**: point the plugin at the **real** portal and check it for real
+   (never done: everything so far ran against captured real answers and the fake). In the plugin's settings enter the portal address
+   and its Display device key, press "Tester la connexion", then compare the bubble with the portal's own page. Capture anything
+   that differs as a new fixture in `Jellyfin.Plugin.JellyPortal.Tests/Fixtures/` (re-capture from the real route, never by hand).
+3. **Cut `v0.1.0-rc.1`** (Jellyfin `0.1.0.1`) from `main` once #6 is merged: `git tag v0.1.0-rc.1 && git push origin v0.1.0-rc.1`
+   (Claude may push RC tags, never a stable one, and tags cannot be deleted or moved). Check the GitHub pre-release, the
+   `manifest-unstable.json` entry (MD5 = the zip served at `sourceUrl`), and an install from the catalog on the dev Jellyfin
+   (add the unstable repository on purpose and remove the local dev build: see the auto-update trap in *Dev loop*).
+4. **Final report to the owner**: what works, what was tested and what was not, known limits, and the Playwright screenshots
+   (`./screenshots/` is gitignored; regenerate with `dev/e2e/bubble.py` and `dev/e2e/contact_sheet.py`, Read the PNGs to show them).
+
+**Known limits / not verified (say so in the report):** the real portal 1.12.0 and the owner's production Jellyfin were never
+contacted; Jellyfin Desktop and the Android app were not tried (only a desktop Chromium, at 1280 and 390 px); a hidden tab is
+simulated by overriding `document.hidden`; the Legacy layout was driven as `desktop-legacy`/`mobile-legacy` through
+`localStorage.layout`; `v0.0.1-rc.1` predates all of the plugin's real features.
+
+**To resume a session on the dev VM** (state lives in `dev/data/`, gitignored; Docker container `jellyportal-dev`, stopped when idle):
+```
+export PATH=$HOME/.dotnet:$HOME/.local/node/bin:$PATH
+dev/dev.sh --no-logs                                   # build, package like a release, install, restart Jellyfin 12.2
+python3 dev/jf.py configure --cache 5 --poll 10        # then restart: the e2e scripts expect a 5 s cache and a 10 s poll
+(nohup python3 dev/fake_portal.py --host 172.17.0.1 --port 8099 > dev/data/fake-portal.log 2>&1 &)
+dev/data/venv/bin/python -u dev/e2e/bubble.py          # ~12 min; or name scenarios; never run two e2e at once (shared server)
+dev/data/venv/bin/python -u dev/e2e/behaviour.py       # ~6 min
+dotnet test Jellyfin.Plugin.JellyPortal.sln; node --test client-tests/*.test.js; python3 -m unittest discover -s tools/tests; python3 -m unittest discover -s dev/tests
+```
+Do not run `dev/dev.sh` while an e2e script is running (it stops the container). The Python e2e output is buffered unless `-u`.
+The dev admin and a `viewer` user are in `dev/data/dev-*.json` (random passwords, gitignored); the dev Jellyfin listens on
+127.0.0.1 only and its Jelly Portal repository must stay unconfigured (auto-update).
 
 ## Project phases and gates
 

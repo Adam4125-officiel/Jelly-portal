@@ -7,9 +7,9 @@ header icons. The icon reflects the overall state of your self-hosted services a
 bubble over the current page with the details: services, maintenance in progress or coming up, and
 active announcements.
 
-> **Status: early development.** The repository, the release pipeline, the connection to the portal, the settings
-> page and the injection into the web client are in place and tested; the icon and its bubble are the next step. This
-> README describes what it is being built to do.
+> **Status: pre-release.** Everything described below works and has been checked in a real browser against a Jellyfin
+> 12.2 and a stand-in portal that has the shape of the real one; what has not been seen yet is the real portal 1.12.0
+> in production. Install it from the **unstable** repository.
 
 ## Requirements
 
@@ -56,22 +56,37 @@ File Transformation is installed.
 The portal must be **Status Portal 1.12.0 or newer** (it adds the `detail=full` option this plugin reads) with its
 Display device API switched on.
 
-## How it will look
+## How it looks
 
-The icon shows one state at a time:
+The icon sits with the other icons of the Jellyfin header (Modern and Legacy layouts) and shows one state at a time:
+
+![The six states of the icon](docs/images/states.png)
 
 | State | Meaning | Look |
 |---|---|---|
-| Down | at least one service is down | red |
-| Maintenance in progress | a maintenance window is under way | violet, gently pulsing |
-| Degraded | a service is degraded | orange |
-| Maintenance soon | one is scheduled inside the window | normal icon with a clock badge |
+| Down | at least one service is down, or the portal has an open incident and nothing is marked down yet | red |
+| Maintenance in progress | a maintenance window is under way, or a service was set to maintenance by hand | violet, gently pulsing |
+| Degraded | a service is degraded, or an incident is open | orange |
+| Maintenance soon | a maintenance is planned inside the configured window | normal icon with a clock badge |
 | OK | everything is fine | discreet, like the other header icons |
 | Unknown | the portal cannot be reached | grey (never red) |
 
-Clicking it opens a bubble under the icon: no page change, closes on a click outside, on Escape or
-on a second click on the icon. On a phone it is still a bubble, never full screen. Screenshots will
-be added here with the first feature release.
+An open incident always makes the icon at least orange, even if no service is marked down, so that an incident created
+by hand is seen. Red wins over everything, then violet, then orange.
+
+Clicking the icon opens a **bubble** under it, over the page you are on: nothing navigates and the URL never changes. It
+closes on a click outside, on Escape or on a second click on the icon. On a phone it is still a bubble (the screen width
+minus 16 px), never full screen.
+
+| Modern layout | Legacy layout | Phone |
+|---|---|---|
+| ![Bubble, Modern layout](docs/images/bubble-modern.png) | ![Bubble, Legacy layout](docs/images/bubble-legacy.png) | ![Bubble on a phone](docs/images/bubble-phone.png) |
+
+It lists the services that are down, then the open incidents, the other services, the maintenance in progress (with the
+time left), the maintenance to come (a countdown such as "dans 3 h", the priority ones first) and the announcements.
+Times are shown in the time zone of the browser, in French. A long list of healthy services is folded behind one line
+when there is something else to read. The page refreshes by itself at the configured interval, pauses while the tab is
+hidden and refreshes at once when you come back.
 
 ## Development
 
