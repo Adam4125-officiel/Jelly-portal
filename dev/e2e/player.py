@@ -26,7 +26,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import jf  # noqa: E402
-from common import BASE, ROOT, SHOTS, Recorder, chrome, login  # noqa: E402
+from common import BASE, ROOT, SHOTS, Recorder, chrome, login, set_language  # noqa: E402
 from playwright.sync_api import sync_playwright  # noqa: E402
 
 FAKE = "http://172.17.0.1:8099"
@@ -252,6 +252,7 @@ def run_combo(browser, item, name, layout, vw, vh):
     ctx.close()
 
 
+set_language()    # nothing here checks wording, but the screenshots should not depend on the run before
 scenario("ok")
 item_id = ensure_video()
 with sync_playwright() as p:
