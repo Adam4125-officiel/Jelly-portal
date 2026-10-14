@@ -132,7 +132,7 @@ public class SummaryServiceTests
     {
         // The address the plugin uses is often a private one (a machine on the local network). Every signed-in user
         // gets the summary, so it must not be in it, whatever the outcome of the reading.
-        const string Private = "http://192.168.0.55:5000";
+        const string Private = "http://nas.internal.example:5000";
         _settings.Current = Configured(url: Private, publicUrl: publicUrl);
         var failing = new CountingClient(_ => Task.FromResult(Failure(SummaryFailure.Timeout, _clock.GetUtcNow())));
         var summaries = new[]
@@ -145,7 +145,7 @@ public class SummaryServiceTests
         foreach (var dto in summaries.Append(unconfigured))
         {
             var json = System.Text.Json.JsonSerializer.Serialize(dto);
-            Assert.DoesNotContain("192.168.0.55", json, StringComparison.Ordinal);
+            Assert.DoesNotContain("nas.internal.example", json, StringComparison.Ordinal);
             Assert.DoesNotContain(":5000", json, StringComparison.Ordinal);
         }
     }
