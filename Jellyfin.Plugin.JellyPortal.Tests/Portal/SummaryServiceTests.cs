@@ -99,6 +99,22 @@ public class SummaryServiceTests
         Assert.True(dto.Maintenance.Upcoming[0].Priority);
     }
 
+    [Theory]
+    [InlineData("en", "en")]
+    [InlineData("fr", "fr")]
+    [InlineData("auto", "auto")]
+    [InlineData("klingon", "en")]
+    public async Task TheLanguageSettingReachesTheBrowserInEveryState(string setting, string expected)
+    {
+        _settings.Current = JellyPortalSettings.From(Url, PublicUrl, "k", 45, 30, 24, "", false, setting);
+        var good = await Service(Returning(Builders.Snapshot())).GetAsync(CancellationToken.None);
+        Assert.Equal(expected, good.Language);
+        var failing = new CountingClient(_ => Task.FromResult(Failure(SummaryFailure.Timeout, _clock.GetUtcNow())));
+        Assert.Equal(expected, (await Service(failing).GetAsync(CancellationToken.None)).Language);
+        _settings.Current = JellyPortalSettings.From("", "", "", 45, 30, 24, "", false, setting);
+        Assert.Equal(expected, (await Service(Returning(Builders.Snapshot())).GetAsync(CancellationToken.None)).Language);
+    }
+
     [Fact]
     public async Task WithoutAPublicAddressThereIsNoLink()
     {

@@ -15,6 +15,7 @@ namespace Jellyfin.Plugin.JellyPortal.Portal;
 /// <param name="SoonWindowHours">How far ahead a planned maintenance makes the clock badge appear.</param>
 /// <param name="PriorityServices">Names of the priority services.</param>
 /// <param name="AdminsOnly">Whether only administrators see the icon.</param>
+/// <param name="Language">The language setting: en, fr or auto.</param>
 public sealed record JellyPortalSettings(
     string PortalUrl,
     string PublicUrl,
@@ -23,7 +24,8 @@ public sealed record JellyPortalSettings(
     int CacheSeconds,
     int SoonWindowHours,
     IReadOnlyList<string> PriorityServices,
-    bool AdminsOnly)
+    bool AdminsOnly,
+    string Language)
 {
     /// <summary>Gets the default and the allowed range of the browser polling interval.</summary>
     public static (int Default, int Min, int Max) PollRange => (60, 10, 3600);
@@ -53,6 +55,7 @@ public sealed record JellyPortalSettings(
     /// <param name="soonWindowHours">Window of the clock badge.</param>
     /// <param name="priorityServices">One name per line.</param>
     /// <param name="adminsOnly">Visibility.</param>
+    /// <param name="language">The language setting as stored; anything unknown is the default.</param>
     /// <returns>Settings with every number inside its range.</returns>
     public static JellyPortalSettings From(
         string? portalUrl,
@@ -62,7 +65,8 @@ public sealed record JellyPortalSettings(
         int cacheSeconds,
         int soonWindowHours,
         string? priorityServices,
-        bool adminsOnly) => new(
+        bool adminsOnly,
+        string? language = null) => new(
             (portalUrl ?? string.Empty).Trim(),
             (publicUrl ?? string.Empty).Trim(),
             (apiKey ?? string.Empty).Trim(),
@@ -70,5 +74,6 @@ public sealed record JellyPortalSettings(
             Math.Clamp(cacheSeconds, CacheRange.Min, CacheRange.Max),
             (int)SummaryOptions.WindowFromHours(soonWindowHours).TotalHours,
             SummaryOptions.ParsePriorityNames(priorityServices),
-            adminsOnly);
+            adminsOnly,
+            Languages.Normalize(language));
 }

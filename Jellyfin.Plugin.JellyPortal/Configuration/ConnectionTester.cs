@@ -4,18 +4,18 @@ using Jellyfin.Plugin.JellyPortal.Summary;
 
 namespace Jellyfin.Plugin.JellyPortal.Configuration;
 
-/// <summary>The outcome of "test the connection".</summary>
+/// <summary>The outcome of "test the connection": data only, the settings page words it in its own language.</summary>
 /// <param name="Ok">Whether the portal answered a usable summary.</param>
-/// <param name="Reason">The failure code when it did not.</param>
-/// <param name="Message">A sentence for the administrator, in French, saying what to do.</param>
+/// <param name="Reason">The failure code when it did not (a summary failure, or a refused setting such as invalid_portal_url).</param>
+/// <param name="SiteName">The portal's site name when it answered, otherwise null.</param>
 /// <param name="Services">How many services the portal reported.</param>
 public sealed record ConnectionResult(
     [property: JsonPropertyName("ok")] bool Ok,
     [property: JsonPropertyName("reason")] string? Reason,
-    [property: JsonPropertyName("message")] string Message,
+    [property: JsonPropertyName("siteName")] string? SiteName,
     [property: JsonPropertyName("services")] int Services);
 
-/// <summary>Asks the portal once, now, with the settings as typed, and says in words what is wrong.</summary>
+/// <summary>Asks the portal once, now, with the settings as typed, and reports what came back.</summary>
 public static class ConnectionTester
 {
     /// <summary>Tests a connection. An explicit action of the administrator, so it may wait on the network.</summary>
@@ -28,25 +28,10 @@ public static class ConnectionTester
         var reading = await client.ReadAsync(settings, cancellationToken).ConfigureAwait(false);
         if (reading.Outcome.Snapshot is { } snapshot)
         {
-            var count = snapshot.Services.Count;
-            return new ConnectionResult(true, null, $"Connexion réussie : le portal « {snapshot.SiteName} » suit {count} service{(count > 1 ? "s" : string.Empty)}.", count);
+            return new ConnectionResult(true, null, snapshot.SiteName, snapshot.Services.Count);
         }
 
         var failure = reading.Outcome.Failure ?? SummaryFailure.BadResponse;
-        return new ConnectionResult(false, failure.Name(), Explain(failure), 0);
+        return new ConnectionResult(false, failure.Name(), null, 0);
     }
-
-    /// <summary>Says what a failure means and what to do about it.</summary>
-    /// <param name="failure">The failure.</param>
-    /// <returns>A sentence in French.</returns>
-    public static string Explain(SummaryFailure failure) => failure switch
-    {
-        SummaryFailure.NotConfigured => "Renseignez l'adresse du portal et la clé API.",
-        SummaryFailure.DeviceApiDisabled => "Le portal répond 404 : son API « Display device » est désactivée (dans l'administration du portal, page Display device), ou cette adresse n'est pas celle du portal.",
-        SummaryFailure.BadApiKey => "Le portal refuse la clé API (401). Copiez la clé affichée dans l'administration du portal, page Display device.",
-        SummaryFailure.Unreachable => "Impossible de joindre le portal. Vérifiez l'adresse et le port, et que le serveur Jellyfin peut atteindre cette machine.",
-        SummaryFailure.Timeout => "Le portal ne répond pas dans les 5 secondes.",
-        SummaryFailure.PortalOutdated => "Ce portal est trop ancien : il faut la version 1.12.0 ou plus récente (paramètre detail=full).",
-        _ => "Le portal a répondu quelque chose d'inattendu. Vérifiez que l'adresse est bien celle du status portal (et pas celle d'un proxy ou d'une autre application).",
-    };
 }

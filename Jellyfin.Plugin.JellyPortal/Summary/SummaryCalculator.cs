@@ -17,6 +17,7 @@ public static class SummaryCalculator
     /// <param name="publicUrl">The public address of the portal, for the link. Blank means no link.</param>
     /// <param name="fetchedAt">When the portal was read, on this machine's clock.</param>
     /// <param name="pollSeconds">The configured polling interval, passed on to the browser.</param>
+    /// <param name="language">The language setting, passed on to the browser.</param>
     /// <returns>The summary.</returns>
     public static SummaryDto Calculate(
         PortalSnapshot snapshot,
@@ -24,7 +25,8 @@ public static class SummaryCalculator
         SummaryOptions options,
         string publicUrl,
         DateTimeOffset fetchedAt,
-        int pollSeconds = 60)
+        int pollSeconds = 60,
+        string language = Languages.Default)
     {
         var priority = new HashSet<string>(options.PriorityServices, StringComparer.OrdinalIgnoreCase);
         bool IsPriority(IEnumerable<string> names) => names.Any(priority.Contains);
@@ -92,6 +94,7 @@ public static class SummaryCalculator
             State = state.Name(),
             Now = PortalTime.Format(asOf),
             PollSeconds = pollSeconds,
+            Language = Languages.Normalize(language),
             Portal = new PortalInfoDto { Name = snapshot.SiteName, Url = LinkOrNull(publicUrl), FetchedAt = PortalTime.Format(fetchedAt) },
             Services = snapshot.Services
                 .Select(s => new ServiceDto { Name = s.Name, Status = StatusName(s.Status), Priority = priority.Contains(s.Name) })
@@ -120,13 +123,15 @@ public static class SummaryCalculator
     /// <param name="publicUrl">The public address, if any, so the panel can still link to it.</param>
     /// <param name="utcNow">This machine's clock.</param>
     /// <param name="pollSeconds">The configured polling interval, passed on to the browser.</param>
+    /// <param name="language">The language setting, passed on to the browser.</param>
     /// <returns>The summary.</returns>
-    public static SummaryDto Unavailable(SummaryFailure reason, string publicUrl, DateTimeOffset utcNow, int pollSeconds = 60) => new()
+    public static SummaryDto Unavailable(SummaryFailure reason, string publicUrl, DateTimeOffset utcNow, int pollSeconds = 60, string language = Languages.Default) => new()
     {
         State = SummaryState.Unknown.Name(),
         Reason = reason.Name(),
         Now = PortalTime.Format(utcNow),
         PollSeconds = pollSeconds,
+        Language = Languages.Normalize(language),
         Portal = new PortalInfoDto { Url = LinkOrNull(publicUrl) },
     };
 

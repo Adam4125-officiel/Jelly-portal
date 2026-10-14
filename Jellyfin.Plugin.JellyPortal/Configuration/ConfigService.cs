@@ -49,6 +49,10 @@ public sealed class ConfigView
     [JsonPropertyName("adminsOnly")]
     public bool AdminsOnly { get; init; }
 
+    /// <summary>Gets the language setting: en, fr or auto.</summary>
+    [JsonPropertyName("language")]
+    public string Language { get; init; } = Languages.Default;
+
     /// <summary>Gets how registering with File Transformation went: pending, registered, not_installed, incompatible or failed.</summary>
     [JsonPropertyName("fileTransformation")]
     public string FileTransformation { get; init; } = "pending";
@@ -96,11 +100,15 @@ public sealed class ConfigUpdate
     /// <summary>Gets or sets the visibility.</summary>
     [JsonPropertyName("adminsOnly")]
     public bool? AdminsOnly { get; set; }
+
+    /// <summary>Gets or sets the language setting: en, fr or auto. Null leaves it as it is; anything else is refused.</summary>
+    [JsonPropertyName("language")]
+    public string? Language { get; set; }
 }
 
 /// <summary>The outcome of applying an update.</summary>
 /// <param name="Configuration">The new configuration, or null when the update was refused.</param>
-/// <param name="Error">Why it was refused, in French, for the administrator.</param>
+/// <param name="Error">Why it was refused, as a code (invalid_portal_url, invalid_public_url, invalid_language): the settings page words it.</param>
 public sealed record ConfigApplyResult(PluginConfiguration? Configuration, string? Error);
 
 /// <summary>Builds what the settings page shows and applies what it submits. No Jellyfin service involved.</summary>
@@ -123,6 +131,7 @@ public static class ConfigService
             SoonWindowHours = settings.SoonWindowHours,
             PriorityServices = string.Join('\n', settings.PriorityServices),
             AdminsOnly = settings.AdminsOnly,
+            Language = settings.Language,
             FileTransformation = injection switch
             {
                 RegistrationResult.Registered => "registered",
@@ -149,17 +158,18 @@ public static class ConfigService
         var url = (update.PortalUrl ?? current.PortalUrl).Trim();
         if (url.Length > 0 && !PortalClient.TryBuildUri(url, out _))
         {
-            return new ConfigApplyResult(
-                null,
-                "L'adresse du portal n'est pas valide. Elle doit commencer par http:// ou https://, sans identifiant, sans paramètres (par exemple http://192.168.1.10:5000).");
+            return new ConfigApplyResult(null, "invalid_portal_url");
         }
 
         var publicUrl = (update.PublicUrl ?? current.PublicUrl).Trim();
         if (publicUrl.Length > 0 && !PortalClient.TryBuildUri(publicUrl, out _))
         {
-            return new ConfigApplyResult(
-                null,
-                "L'adresse publique n'est pas valide. Elle doit commencer par http:// ou https://, sans identifiant, sans paramètres (par exemple https://status.example.com).");
+            return new ConfigApplyResult(null, "invalid_public_url");
+        }
+
+        if (update.Language is not null && !Languages.IsValid(update.Language))
+        {
+            return new ConfigApplyResult(null, "invalid_language");
         }
 
         var key = update.ClearApiKey ? string.Empty
@@ -174,7 +184,8 @@ public static class ConfigService
             update.CacheSeconds ?? current.CacheSeconds,
             update.SoonWindowHours ?? current.SoonWindowHours,
             update.PriorityServices ?? current.PriorityServices,
-            update.AdminsOnly ?? current.AdminsOnly);
+            update.AdminsOnly ?? current.AdminsOnly,
+            update.Language ?? current.Language);
 
         return new ConfigApplyResult(
             new PluginConfiguration
@@ -187,6 +198,7 @@ public static class ConfigService
                 SoonWindowHours = clamped.SoonWindowHours,
                 PriorityServices = string.Join('\n', clamped.PriorityServices),
                 AdminsOnly = clamped.AdminsOnly,
+                Language = clamped.Language,
             },
             null);
     }

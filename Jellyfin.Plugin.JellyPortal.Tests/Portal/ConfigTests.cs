@@ -112,12 +112,11 @@ public class ConfigServiceTests
     [InlineData("javascript:alert(1)")]
     [InlineData("http://user:pass@portal.example")]
     [InlineData("http://portal.example/?x=1")]
-    public void AnAddressThatCannotBeUsedIsRefusedInFrenchAndNothingIsApplied(string url)
+    public void AnAddressThatCannotBeUsedIsRefusedWithACodeAndNothingIsApplied(string url)
     {
         var result = ConfigService.Apply(Saved(), new ConfigUpdate { PortalUrl = url });
         Assert.Null(result.Configuration);
-        Assert.Contains("http://", result.Error, StringComparison.Ordinal);
-        Assert.Contains("adresse", result.Error, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("invalid_portal_url", result.Error);
     }
 
     [Fact]
@@ -148,8 +147,55 @@ public class ConfigServiceTests
     {
         var result = ConfigService.Apply(Saved(), new ConfigUpdate { PublicUrl = url, PollSeconds = 99 });
         Assert.Null(result.Configuration);
-        Assert.Contains("publique", result.Error, StringComparison.Ordinal);
-        Assert.Contains("https://", result.Error, StringComparison.Ordinal);
+        Assert.Equal("invalid_public_url", result.Error);
+    }
+
+    [Fact]
+    public void TheLanguageIsEnglishUntilSomeoneChoosesAnother()
+    {
+        Assert.Equal("en", new PluginConfiguration().Language);
+        Assert.Equal("en", new PluginConfiguration().ToSettings().Language);
+        Assert.Equal("en", ConfigService.View(new PluginConfiguration(), RegistrationResult.Pending).Language);
+    }
+
+    [Theory]
+    [InlineData("fr", "fr")]
+    [InlineData("auto", "auto")]
+    [InlineData("EN", "en")]
+    [InlineData("  Fr ", "fr")]
+    public void ALanguageThatExistsIsKeptNormalised(string typed, string stored)
+    {
+        var result = ConfigService.Apply(Saved(), new ConfigUpdate { Language = typed });
+        Assert.Equal(stored, result.Configuration!.Language);
+        Assert.Equal(stored, ConfigService.View(result.Configuration, RegistrationResult.Registered).Language);
+    }
+
+    [Theory]
+    [InlineData("de")]
+    [InlineData("")]
+    [InlineData("klingon")]
+    [InlineData("fr-FR")]
+    public void ALanguageThatDoesNotExistIsRefusedAndNothingIsApplied(string typed)
+    {
+        var result = ConfigService.Apply(Saved(), new ConfigUpdate { Language = typed, PollSeconds = 99 });
+        Assert.Null(result.Configuration);
+        Assert.Equal("invalid_language", result.Error);
+    }
+
+    [Fact]
+    public void TheLanguageIsKeptWhenNotSubmitted()
+    {
+        var saved = Saved();
+        saved.Language = "fr";
+        Assert.Equal("fr", ConfigService.Apply(saved, new ConfigUpdate { PollSeconds = 50 }).Configuration!.Language);
+    }
+
+    [Fact]
+    public void AStoredLanguageThatIsNotOneOfOursReadsAsEnglish()
+    {
+        // An edited file, or a value from a future version: the plugin must still show something readable.
+        var stored = new PluginConfiguration { Language = "klingon" };
+        Assert.Equal("en", stored.ToSettings().Language);
     }
 
     [Fact]
@@ -201,22 +247,14 @@ public class ConnectionTesterTests
         ConnectionTester.TestAsync(client, settings ?? Configured(), CancellationToken.None);
 
     [Fact]
-    public async Task ASuccessNamesThePortalAndCountsItsServices()
+    public async Task ASuccessCarriesThePortalsNameAndHowManyServicesItTracks()
     {
         var snapshot = Builders.Snapshot([Builders.Svc("A"), Builders.Svc("B"), Builders.Svc("C")]);
         var result = await Test(new CountingClient(_ => Task.FromResult(Reading(snapshot, Clock.GetUtcNow()))));
         Assert.True(result.Ok);
         Assert.Null(result.Reason);
+        Assert.Equal("Home", result.SiteName);
         Assert.Equal(3, result.Services);
-        Assert.Contains("Home", result.Message, StringComparison.Ordinal);
-        Assert.Contains("3 services", result.Message, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public async Task OneServiceIsNotPlural()
-    {
-        var result = await Test(new CountingClient(_ => Task.FromResult(Reading(Builders.Snapshot([Builders.Svc("A")]), Clock.GetUtcNow()))));
-        Assert.Contains("1 service.", result.Message, StringComparison.Ordinal);
     }
 
     [Theory]
@@ -227,28 +265,15 @@ public class ConnectionTesterTests
     [InlineData(SummaryFailure.Timeout)]
     [InlineData(SummaryFailure.BadResponse)]
     [InlineData(SummaryFailure.PortalOutdated)]
-    public async Task EachFailureGivesItsReasonCodeAndASentenceThatSaysWhatToDo(SummaryFailure failure)
+    public async Task EachFailureGivesItsReasonCodeAndNothingElse(SummaryFailure failure)
     {
+        // The settings page words it, in its own language: the server sends a code, never a sentence (or a secret).
         var result = await Test(new CountingClient(_ => Task.FromResult(Failure(failure, Clock.GetUtcNow()))));
         Assert.False(result.Ok);
         Assert.Equal(failure.Name(), result.Reason);
-        Assert.True(result.Message.Length > 30);
-        Assert.DoesNotContain("k-secret", result.Message, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void EveryFailureHasADifferentExplanation()
-    {
-        var texts = Enum.GetValues<SummaryFailure>().Select(ConnectionTester.Explain).ToList();
-        Assert.Equal(texts.Count, texts.Distinct().Count());
-    }
-
-    [Fact]
-    public void TheExplanationsPointToTheRightPlaceInThePortal()
-    {
-        Assert.Contains("Display device", ConnectionTester.Explain(SummaryFailure.DeviceApiDisabled), StringComparison.Ordinal);
-        Assert.Contains("Display device", ConnectionTester.Explain(SummaryFailure.BadApiKey), StringComparison.Ordinal);
-        Assert.Contains("1.12.0", ConnectionTester.Explain(SummaryFailure.PortalOutdated), StringComparison.Ordinal);
+        Assert.Null(result.SiteName);
+        Assert.Equal(0, result.Services);
+        Assert.DoesNotContain("k-secret", System.Text.Json.JsonSerializer.Serialize(result), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -277,12 +302,42 @@ public class SettingsPageTests
     }
 
     [Fact]
-    public void ThePageIsEmbeddedAndSpeaksFrench()
+    public void ThePageIsEmbeddedWithItsTextsInBothLanguages()
     {
         var page = Page();
-        Assert.Contains("Enregistrer", page, StringComparison.Ordinal);
-        Assert.Contains("Tester la connexion", page, StringComparison.Ordinal);
-        Assert.Contains("Services prioritaires", page, StringComparison.Ordinal);
+        Assert.Contains("save: 'Save'", page, StringComparison.Ordinal);
+        Assert.Contains("save: 'Enregistrer'", page, StringComparison.Ordinal);
+        Assert.Contains("test: 'Test the connection'", page, StringComparison.Ordinal);
+        Assert.Contains("test: 'Tester la connexion'", page, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ThePageHasASentenceInBothLanguagesForEveryReasonTheServerCanSend()
+    {
+        // The server sends codes (a failure reason, or a refused setting) and the page words them: one entry per
+        // language per code, so a new failure reason that nobody worded fails here instead of showing as an error.
+        var page = Page();
+        var codes = Enum.GetValues<SummaryFailure>().Select(f => f.Name()).Concat(["invalid_portal_url", "invalid_public_url", "invalid_language"]);
+        foreach (var code in codes)
+        {
+            Assert.True(
+                System.Text.RegularExpressions.Regex.Matches(page, @"\breason_" + code + @":").Count == 2,
+                $"the page must have a reason_{code} sentence in English and in French");
+        }
+    }
+
+    [Fact]
+    public void EveryTextTheMarkupAsksForExistsInBothLanguages()
+    {
+        var page = Page();
+        var keys = System.Text.RegularExpressions.Regex.Matches(page, "data-t=\"(\\w+)\"").Select(m => m.Groups[1].Value).Distinct().ToList();
+        Assert.True(keys.Count > 10);
+        foreach (var key in keys)
+        {
+            Assert.True(
+                System.Text.RegularExpressions.Regex.Matches(page, @"\b" + key + @": '").Count == 2,
+                $"data-t=\"{key}\" needs exactly one sentence in English and one in French");
+        }
     }
 
     [Fact]
@@ -310,7 +365,7 @@ public class SettingsPageTests
     public void ThePageHasEveryFieldTheScriptReads()
     {
         var page = Page();
-        foreach (var id in new[] { "jpPortalUrl", "jpPublicUrl", "jpApiKey", "jpClearKey", "jpTest", "jpTestResult", "jpAdminsOnly", "jpPriority", "jpSoon", "jpPoll", "jpCache", "jpSaveResult", "jpFileTransformation", "jpForm" })
+        foreach (var id in new[] { "jpPortalUrl", "jpPublicUrl", "jpLanguage", "jpApiKey", "jpClearKey", "jpTest", "jpTestResult", "jpAdminsOnly", "jpPriority", "jpSoon", "jpPoll", "jpCache", "jpSaveResult", "jpFileTransformation", "jpForm" })
         {
             Assert.Contains($"id=\"{id}\"", page, StringComparison.Ordinal);
         }

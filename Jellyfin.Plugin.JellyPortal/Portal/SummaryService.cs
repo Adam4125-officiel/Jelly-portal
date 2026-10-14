@@ -40,12 +40,12 @@ public sealed class SummaryService
         var utcNow = _time.GetUtcNow();
         if (reading.Outcome.Snapshot is not { } snapshot)
         {
-            return SummaryCalculator.Unavailable(reading.Outcome.Failure ?? SummaryFailure.BadResponse, settings.PublicUrl, utcNow, settings.PollSeconds);
+            return SummaryCalculator.Unavailable(reading.Outcome.Failure ?? SummaryFailure.BadResponse, settings.PublicUrl, utcNow, settings.PollSeconds, settings.Language);
         }
 
         // Recomputed on every request: a window that starts between two readings must turn
         // "coming up" into "in progress" on time, whatever the cache lifetime.
         var asOf = PortalTime.EstimatePortalNow(snapshot.PortalNow, reading.ReadAt, utcNow);
-        return SummaryCalculator.Calculate(snapshot, asOf, settings.ToOptions(), settings.PublicUrl, reading.ReadAt, settings.PollSeconds);
+        return SummaryCalculator.Calculate(snapshot, asOf, settings.ToOptions(), settings.PublicUrl, reading.ReadAt, settings.PollSeconds, settings.Language);
     }
 }

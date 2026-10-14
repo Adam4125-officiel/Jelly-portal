@@ -41,33 +41,174 @@
         return Math.max(MIN_POLL_MS, Math.round(seconds * 1000));
     }
 
-    /** "3 h", "45 min", "2 j": the amount, in the unit that reads best. Real elapsed time, never wall-clock. */
-    function duration(ms) {
+    // ------------------------------------------------------------------------------------------------------
+    // Wording, in English and in French (the administrator's setting, or each viewer's own Jellyfin language)
+    // ------------------------------------------------------------------------------------------------------
+
+    // One table per language, with exactly the same keys (a test checks it, and that every state and every
+    // failure reason the server can send has its entry). {0} is replaced by the first argument of text().
+    var TEXT_EN = {
+        state_down: 'At least one service is down',
+        state_maintenance_ongoing: 'Maintenance in progress',
+        state_degraded: 'Degraded performance',
+        state_maintenance_soon: 'Maintenance planned soon',
+        state_ok: 'All services are operational',
+        state_unknown: 'Status unavailable',
+        reason_not_configured: 'The plugin is not configured yet: the status portal’s address and key are missing.',
+        reason_device_api_disabled: 'The status portal’s API is switched off.',
+        reason_bad_api_key: 'The status portal refuses the configured API key.',
+        reason_unreachable: 'The status portal cannot be reached.',
+        reason_timeout: 'The status portal is not answering.',
+        reason_bad_response: 'The status portal answered something unexpected.',
+        reason_portal_outdated: 'The status portal is too old: version 1.12.0 or newer is required.',
+        reason_jellyfin_unreachable: 'The Jellyfin server cannot be reached.',
+        status_operational: 'Operational',
+        status_slow: 'Slow',
+        status_degraded: 'Degraded',
+        status_maintenance: 'Under maintenance',
+        status_down: 'Down',
+        status_unknown: 'Unknown',
+        incident_investigating: 'Investigating',
+        incident_identified: 'Cause identified',
+        incident_monitoring: 'Monitoring',
+        h_services: 'Services',
+        h_other_services: 'Other services',
+        h_incidents: 'Ongoing incidents',
+        h_maintenance: 'Maintenance in progress',
+        h_upcoming: 'Upcoming maintenance',
+        h_announcements: 'Announcements',
+        tag_priority: 'Priority',
+        tag_pinned: 'Pinned',
+        meta_in_progress: 'in progress',
+        meta_until: 'until {0}',
+        fold_show: 'Show the {0} operational services',
+        fold_hide: 'Hide the {0} operational services',
+        link_open: 'Open the status portal',
+        foot_updated: 'Updated at {0}',
+        aria_bubble: 'Service status',
+        aria_icon: 'Service status: {0}',
+        when_today: 'today',
+        when_tomorrow: 'tomorrow',
+        when_yesterday: 'yesterday',
+        when_at: 'at',
+        unit_min: 'min',
+        unit_h: 'h',
+        unit_d: 'd',
+        rel_in: 'in {0}',
+        rel_in_less: 'in less than a minute',
+        rel_since: 'for {0}',
+        rel_since_less: 'just now',
+        rel_ends: 'ends in {0}',
+        rel_ends_less: 'ends in less than a minute',
+        rel_ends_over: 'planned end passed'
+    };
+
+    var TEXT_FR = {
+        state_down: 'Au moins un service est hors service',
+        state_maintenance_ongoing: 'Maintenance en cours',
+        state_degraded: 'Fonctionnement dégradé',
+        state_maintenance_soon: 'Maintenance prévue prochainement',
+        state_ok: 'Tous les services fonctionnent',
+        state_unknown: 'État indisponible',
+        reason_not_configured: 'Le plugin n’est pas encore configuré : l’adresse et la clé du status portal manquent.',
+        reason_device_api_disabled: 'L’API du status portal est désactivée.',
+        reason_bad_api_key: 'Le status portal refuse la clé API configurée.',
+        reason_unreachable: 'Impossible de joindre le status portal.',
+        reason_timeout: 'Le status portal ne répond pas.',
+        reason_bad_response: 'Le status portal a répondu quelque chose d’inattendu.',
+        reason_portal_outdated: 'Le status portal est trop ancien : la version 1.12.0 ou plus récente est nécessaire.',
+        reason_jellyfin_unreachable: 'Impossible de contacter le serveur Jellyfin.',
+        status_operational: 'Opérationnel',
+        status_slow: 'Lent',
+        status_degraded: 'Dégradé',
+        status_maintenance: 'En maintenance',
+        status_down: 'Hors service',
+        status_unknown: 'Inconnu',
+        incident_investigating: 'Investigation en cours',
+        incident_identified: 'Cause identifiée',
+        incident_monitoring: 'Sous surveillance',
+        h_services: 'Services',
+        h_other_services: 'Autres services',
+        h_incidents: 'Incidents en cours',
+        h_maintenance: 'Maintenance en cours',
+        h_upcoming: 'Maintenances à venir',
+        h_announcements: 'Annonces',
+        tag_priority: 'Prioritaire',
+        tag_pinned: 'Épinglée',
+        meta_in_progress: 'en cours',
+        meta_until: 'jusqu’à {0}',
+        fold_show: 'Afficher les {0} services opérationnels',
+        fold_hide: 'Masquer les {0} services opérationnels',
+        link_open: 'Ouvrir le status portal',
+        foot_updated: 'Mis à jour à {0}',
+        aria_bubble: 'État des services',
+        aria_icon: 'État des services : {0}',
+        when_today: 'aujourd’hui',
+        when_tomorrow: 'demain',
+        when_yesterday: 'hier',
+        when_at: 'à',
+        unit_min: 'min',
+        unit_h: 'h',
+        unit_d: 'j',
+        rel_in: 'dans {0}',
+        rel_in_less: 'dans moins d’une minute',
+        rel_since: 'depuis {0}',
+        rel_since_less: 'depuis un instant',
+        rel_ends: 'se termine dans {0}',
+        rel_ends_less: 'se termine dans moins d’une minute',
+        rel_ends_over: 'fin prévue dépassée'
+    };
+
+    var TEXTS = { en: TEXT_EN, fr: TEXT_FR };
+
+    /**
+     * 'fr' or 'en'. The setting is 'en', 'fr' or 'auto'; 'auto' follows what this viewer's Jellyfin is displayed in
+     * (jellyfin-web writes it to <html lang>), and anything that is not French is English.
+     */
+    function resolveLanguage(setting, htmlLang) {
+        if (setting === 'fr' || setting === 'en') { return setting; }
+        return /^fr(?:[-_]|$)/i.test(String(htmlLang || '')) ? 'fr' : 'en';
+    }
+
+    /** The locale dates and times are written in: a 24-hour clock in both, whatever the browser's own habits. */
+    function localeOf(lang) { return lang === 'fr' ? 'fr-FR' : 'en-GB'; }
+
+    /** A sentence of the given language, with {0}, {1}... replaced. A key missing from a language falls back to English. */
+    function text(lang, key, args) {
+        var table = TEXTS[lang] || TEXT_EN;
+        var value = table[key] !== undefined ? table[key] : TEXT_EN[key];
+        if (value === undefined) { return ''; }
+        return value.replace(/\{(\d+)\}/g, function (whole, index) { return args && args[Number(index)] !== undefined ? args[Number(index)] : whole; });
+    }
+
+    /** "3 h", "45 min", "2 d": the amount, in the unit that reads best. Real elapsed time, never wall-clock. */
+    function duration(ms, lang) {
         var minutes = Math.floor(Math.max(0, ms) / 60000);
         if (minutes < 1) { return null; }
-        if (minutes < 60) { return minutes + ' min'; }
+        if (minutes < 60) { return minutes + ' ' + text(lang, 'unit_min'); }
         var hours = Math.floor(minutes / 60);
+        var h = text(lang, 'unit_h');
         if (hours < 24) {
             var rest = minutes % 60;
-            return hours < 6 && rest !== 0 ? hours + ' h ' + (rest < 10 ? '0' : '') + rest : hours + ' h';
+            return hours < 6 && rest !== 0 ? hours + ' ' + h + ' ' + (rest < 10 ? '0' : '') + rest : hours + ' ' + h;
         }
-        return Math.floor(hours / 24) + ' j';
+        return Math.floor(hours / 24) + ' ' + text(lang, 'unit_d');
     }
 
-    function inFuture(ms) {
-        var d = duration(ms);
-        return d === null ? 'dans moins d’une minute' : 'dans ' + d;
+    function inFuture(ms, lang) {
+        var d = duration(ms, lang);
+        return d === null ? text(lang, 'rel_in_less') : text(lang, 'rel_in', [d]);
     }
 
-    function sinceAgo(ms) {
-        var d = duration(ms);
-        return d === null ? 'depuis un instant' : 'depuis ' + d;
+    function sinceAgo(ms, lang) {
+        var d = duration(ms, lang);
+        return d === null ? text(lang, 'rel_since_less') : text(lang, 'rel_since', [d]);
     }
 
-    function endsIn(ms) {
-        if (ms <= 0) { return 'fin prévue dépassée'; }
-        var d = duration(ms);
-        return d === null ? 'se termine dans moins d’une minute' : 'se termine dans ' + d;
+    function endsIn(ms, lang) {
+        if (ms <= 0) { return text(lang, 'rel_ends_over'); }
+        var d = duration(ms, lang);
+        return d === null ? text(lang, 'rel_ends_less') : text(lang, 'rel_ends', [d]);
     }
 
     function calendarDay(ms, timeZone) {
@@ -76,80 +217,48 @@
         return { year: get('year'), day: Math.round(Date.UTC(get('year'), get('month') - 1, get('day')) / 86400000) };
     }
 
+    function timeOfDay(ms, timeZone, lang) {
+        return new Intl.DateTimeFormat(localeOf(lang), { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: timeZone }).format(new Date(ms));
+    }
+
     /**
      * An instant as a person reads it, in the given time zone (the browser's own when none is given):
-     * "aujourd'hui à 22:00", "demain à 03:00", "lundi 19 oct. à 22:00". The day is the calendar day in that zone,
-     * so it stays right across a daylight-saving change.
+     * "today at 22:00", "tomorrow at 03:00", "Monday 19 Oct at 22:00" (and the French equivalents). The day is the
+     * calendar day in that zone, so it stays right across a daylight-saving change.
      */
-    function formatWhen(iso, nowMs, timeZone) {
+    function formatWhen(iso, nowMs, timeZone, lang) {
         var ms = parseUtc(iso);
         if (isNaN(ms)) { return ''; }
-        var time = new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: timeZone }).format(new Date(ms));
         var then = calendarDay(ms, timeZone);
         var today = calendarDay(nowMs, timeZone);
         var diff = then.day - today.day;
         var label;
-        if (diff === 0) { label = 'aujourd’hui'; }
-        else if (diff === 1) { label = 'demain'; }
-        else if (diff === -1) { label = 'hier'; }
+        if (diff === 0) { label = text(lang, 'when_today'); }
+        else if (diff === 1) { label = text(lang, 'when_tomorrow'); }
+        else if (diff === -1) { label = text(lang, 'when_yesterday'); }
         else {
             var options = { weekday: 'long', day: 'numeric', month: 'short', timeZone: timeZone };
             if (then.year !== today.year) { options.year = 'numeric'; }
-            label = new Intl.DateTimeFormat('fr-FR', options).format(new Date(ms));
+            label = new Intl.DateTimeFormat(localeOf(lang), options).format(new Date(ms));
         }
-        return label + ' à ' + time;
+        return label + ' ' + text(lang, 'when_at') + ' ' + timeOfDay(ms, timeZone, lang);
     }
 
     /** When something ends, relative to when it starts: just "03:57" the same day, the full wording otherwise. */
-    function formatUntil(endIso, startIso, nowMs, timeZone) {
+    function formatUntil(endIso, startIso, nowMs, timeZone, lang) {
         var end = parseUtc(endIso);
         var start = parseUtc(startIso);
         if (isNaN(end)) { return ''; }
         if (!isNaN(start) && calendarDay(end, timeZone).day === calendarDay(start, timeZone).day) {
-            return new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: timeZone }).format(new Date(end));
+            return timeOfDay(end, timeZone, lang);
         }
-        return formatWhen(endIso, nowMs, timeZone);
+        return formatWhen(endIso, nowMs, timeZone, lang);
     }
 
-    var STATE_TITLES = {
-        down: 'Au moins un service est hors service',
-        maintenance_ongoing: 'Maintenance en cours',
-        degraded: 'Fonctionnement dégradé',
-        maintenance_soon: 'Maintenance prévue prochainement',
-        ok: 'Tous les services fonctionnent',
-        unknown: 'État indisponible'
-    };
-
-    var REASON_TEXTS = {
-        not_configured: 'Le plugin n’est pas encore configuré : l’adresse et la clé du status portal manquent.',
-        device_api_disabled: 'L’API du status portal est désactivée.',
-        bad_api_key: 'Le status portal refuse la clé API configurée.',
-        unreachable: 'Impossible de joindre le status portal.',
-        timeout: 'Le status portal ne répond pas.',
-        bad_response: 'Le status portal a répondu quelque chose d’inattendu.',
-        portal_outdated: 'Le status portal est trop ancien : la version 1.12.0 ou plus récente est nécessaire.',
-        jellyfin_unreachable: 'Impossible de contacter le serveur Jellyfin.'
-    };
-
-    var STATUS_LABELS = {
-        operational: 'Opérationnel',
-        slow: 'Lent',
-        degraded: 'Dégradé',
-        maintenance: 'En maintenance',
-        down: 'Hors service',
-        unknown: 'Inconnu'
-    };
-
-    var INCIDENT_LABELS = {
-        investigating: 'Investigation en cours',
-        identified: 'Cause identifiée',
-        monitoring: 'Sous surveillance'
-    };
-
-    function stateTitle(state) { return STATE_TITLES[state] || STATE_TITLES.unknown; }
-    function reasonText(reason) { return REASON_TEXTS[reason] || REASON_TEXTS.bad_response; }
-    function statusLabel(status) { return STATUS_LABELS[status] || STATUS_LABELS.unknown; }
-    function incidentLabel(status) { return INCIDENT_LABELS[status] || ''; }
+    function stateTitle(state, lang) { return text(lang, TEXT_EN['state_' + state] !== undefined ? 'state_' + state : 'state_unknown'); }
+    function reasonText(reason, lang) { return text(lang, TEXT_EN['reason_' + reason] !== undefined ? 'reason_' + reason : 'reason_bad_response'); }
+    function statusLabel(status, lang) { return text(lang, TEXT_EN['status_' + status] !== undefined ? 'status_' + status : 'status_unknown'); }
+    function incidentLabel(status, lang) { return TEXT_EN['incident_' + status] !== undefined ? text(lang, 'incident_' + status) : ''; }
 
     /** The portal link is only ever followed if it is a plain http(s) address (never javascript: or data:). */
     function safePortalUrl(url) {
@@ -193,7 +302,9 @@
         parseUtc: parseUtc, clockSkew: clockSkew, pollDelayMs: pollDelayMs, duration: duration, inFuture: inFuture,
         sinceAgo: sinceAgo, endsIn: endsIn, formatWhen: formatWhen, formatUntil: formatUntil, stateTitle: stateTitle, reasonText: reasonText,
         statusLabel: statusLabel, incidentLabel: incidentLabel, safePortalUrl: safePortalUrl, placeBubble: placeBubble, isPlayerRoute: isPlayerRoute,
-        REASONS: Object.keys(REASON_TEXTS), STATES: Object.keys(STATE_TITLES)
+        resolveLanguage: resolveLanguage, localeOf: localeOf, text: text, TEXT_EN: TEXT_EN, TEXT_FR: TEXT_FR,
+        REASONS: Object.keys(TEXT_EN).filter(function (k) { return k.indexOf('reason_') === 0; }).map(function (k) { return k.slice(7); }),
+        STATES: Object.keys(TEXT_EN).filter(function (k) { return k.indexOf('state_') === 0; }).map(function (k) { return k.slice(6); })
     };
     if (typeof module !== 'undefined' && module.exports) {
         module.exports = pure;
@@ -256,8 +367,12 @@
         timer: null,
         tick: null,
         open: false,
-        showHealthy: false    // the folded healthy services are expanded
+        showHealthy: false,   // the folded healthy services are expanded
+        language: 'auto'      // the administrator's setting, from the last summary: 'en', 'fr' or 'auto'
     };
+
+    /** 'en' or 'fr', for this viewer, now. */
+    function lang() { return resolveLanguage(model.language, document.documentElement.getAttribute('lang')); }
     var icon = null;
     var bubble = null;
     var raf = 0;
@@ -366,7 +481,7 @@
         var state = summary ? summary.state : 'loading';
         icon.setAttribute('data-state', state);
         if (!summary) { return; }
-        var label = 'État des services : ' + stateTitle(state);
+        var label = text(lang(), 'aria_icon', [stateTitle(state, lang())]);
         icon.setAttribute('aria-label', label);
         icon.title = label;
         icon.querySelector('.jellyportal-badge').hidden = state !== 'maintenance_soon';
@@ -417,41 +532,44 @@
     }
 
     function serviceRow(service) {
+        var L = lang();
         var row = el('div', 'jellyportal-row jellyportal-service');
         row.appendChild(dot(service.status));
         row.appendChild(el('span', 'jellyportal-name', service.name));
-        if (service.priority) { row.appendChild(el('span', 'jellyportal-tag', 'Prioritaire')); }
-        if (service.status !== 'operational') { row.appendChild(el('span', 'jellyportal-status', statusLabel(service.status))); }
+        if (service.priority) { row.appendChild(el('span', 'jellyportal-tag', text(L, 'tag_priority'))); }
+        if (service.status !== 'operational') { row.appendChild(el('span', 'jellyportal-status', statusLabel(service.status, L))); }
         return row;
     }
 
     function listOfServices(names) { return names.join(', '); }
 
     function incidentRow(incident, now) {
+        var L = lang();
         var row = el('div', 'jellyportal-item' + (incident.priority ? ' jellyportal-priority' : ''));
         row.appendChild(el('div', 'jellyportal-title', incident.title));
-        var meta = [incidentLabel(incident.status)];
+        var meta = [incidentLabel(incident.status, L)];
         var since = parseUtc(incident.since);
-        if (!isNaN(since)) { meta.push(sinceAgo(now - since)); }
+        if (!isNaN(since)) { meta.push(sinceAgo(now - since, L)); }
         row.appendChild(el('div', 'jellyportal-meta', meta.filter(Boolean).join(' · ')));
         if (incident.services.length) { row.appendChild(el('div', 'jellyportal-meta', listOfServices(incident.services))); }
         return row;
     }
 
     function maintenanceRow(item, ongoing, now) {
+        var L = lang();
         var row = el('div', 'jellyportal-item' + (item.priority ? ' jellyportal-priority' : ''));
         var title = el('div', 'jellyportal-title');
         title.appendChild(document.createTextNode(item.title));
-        if (item.priority) { title.appendChild(el('span', 'jellyportal-tag', 'Prioritaire')); }
+        if (item.priority) { title.appendChild(el('span', 'jellyportal-tag', text(L, 'tag_priority'))); }
         row.appendChild(title);
         var start = parseUtc(item.startsAt);
         var end = parseUtc(item.endsAt);
         if (ongoing) {
-            row.appendChild(el('div', 'jellyportal-meta', isNaN(end) ? 'en cours' : endsIn(end - now) + ' (' + formatWhen(item.endsAt, now) + ')'));
+            row.appendChild(el('div', 'jellyportal-meta', isNaN(end) ? text(L, 'meta_in_progress') : endsIn(end - now, L) + ' (' + formatWhen(item.endsAt, now, undefined, L) + ')'));
         } else {
-            var when = isNaN(start) ? '' : formatWhen(item.startsAt, now) + ' · ' + inFuture(start - now);
+            var when = isNaN(start) ? '' : formatWhen(item.startsAt, now, undefined, L) + ' · ' + inFuture(start - now, L);
             row.appendChild(el('div', 'jellyportal-meta', when));
-            if (!isNaN(end)) { row.appendChild(el('div', 'jellyportal-meta', 'jusqu’à ' + formatUntil(item.endsAt, item.startsAt, now))); }
+            if (!isNaN(end)) { row.appendChild(el('div', 'jellyportal-meta', text(L, 'meta_until', [formatUntil(item.endsAt, item.startsAt, now, undefined, L)]))); }
         }
         if (item.services.length) { row.appendChild(el('div', 'jellyportal-meta', listOfServices(item.services))); }
         if (item.description) { row.appendChild(el('div', 'jellyportal-text', item.description)); }
@@ -459,17 +577,19 @@
     }
 
     function announcementRow(announcement) {
+        var L = lang();
         var row = el('div', 'jellyportal-item jellyportal-announcement');
         row.setAttribute('data-type', announcement.type);
         var title = el('div', 'jellyportal-title');
         title.appendChild(document.createTextNode(announcement.title));
-        if (announcement.pinned) { title.appendChild(el('span', 'jellyportal-tag', 'Épinglée')); }
+        if (announcement.pinned) { title.appendChild(el('span', 'jellyportal-tag', text(L, 'tag_pinned'))); }
         row.appendChild(title);
         if (announcement.message) { row.appendChild(el('div', 'jellyportal-text', announcement.message)); }
         return row;
     }
 
     function buildContent() {
+        var L = lang();
         var summary = model.summary;
         var now = nowMs();
         var box = el('div', 'jellyportal-content');
@@ -480,24 +600,24 @@
         pill.setAttribute('data-state', state);
         pill.appendChild(glyph(16));
         head.appendChild(pill);
-        head.appendChild(el('span', 'jellyportal-headline', stateTitle(state)));
+        head.appendChild(el('span', 'jellyportal-headline', stateTitle(state, L)));
         box.appendChild(head);
 
         if (!summary || summary.state === 'unknown') {
-            box.appendChild(el('div', 'jellyportal-notice', reasonText(summary && summary.reason ? summary.reason : 'jellyfin_unreachable')));
+            box.appendChild(el('div', 'jellyportal-notice', reasonText(summary && summary.reason ? summary.reason : 'jellyfin_unreachable', L)));
         } else {
             var down = summary.services.filter(function (s) { return s.status === 'down'; });
             var others = summary.services.filter(function (s) { return s.status !== 'down'; });
             if (down.length) {
-                box.appendChild(section('Services', down.length));
+                box.appendChild(section(text(L, 'h_services'), down.length));
                 down.forEach(function (s) { box.appendChild(serviceRow(s)); });
             }
             if (summary.incidents.length) {
-                box.appendChild(section('Incidents en cours', summary.incidents.length));
+                box.appendChild(section(text(L, 'h_incidents'), summary.incidents.length));
                 summary.incidents.forEach(function (i) { box.appendChild(incidentRow(i, now)); });
             }
             if (others.length) {
-                box.appendChild(section(down.length ? 'Autres services' : 'Services', others.length));
+                box.appendChild(section(text(L, down.length ? 'h_other_services' : 'h_services'), others.length));
                 var healthy = others.filter(function (s) { return s.status === 'operational'; });
                 // Folded only when other sections compete for the room: with nothing else to show, the whole list is the answer.
                 var competing = summary.incidents.length + summary.maintenance.ongoing.length + summary.maintenance.upcoming.length + summary.announcements.length > 0;
@@ -505,7 +625,7 @@
                 var folded = foldable && !model.showHealthy;
                 others.forEach(function (s) { if (!(folded && s.status === 'operational')) { box.appendChild(serviceRow(s)); } });
                 if (foldable) {
-                    var toggleRow = el('button', 'jellyportal-fold', (model.showHealthy ? 'Masquer' : 'Afficher') + ' les ' + healthy.length + ' services op\u00e9rationnels');
+                    var toggleRow = el('button', 'jellyportal-fold', text(L, model.showHealthy ? 'fold_hide' : 'fold_show', [healthy.length]));
                     toggleRow.type = 'button';
                     toggleRow.setAttribute('aria-expanded', String(model.showHealthy));
                     toggleRow.addEventListener('click', function () { model.showHealthy = !model.showHealthy; renderBubble(); });
@@ -513,15 +633,15 @@
                 }
             }
             if (summary.maintenance.ongoing.length) {
-                box.appendChild(section('Maintenance en cours', summary.maintenance.ongoing.length));
+                box.appendChild(section(text(L, 'h_maintenance'), summary.maintenance.ongoing.length));
                 summary.maintenance.ongoing.forEach(function (m) { box.appendChild(maintenanceRow(m, true, now)); });
             }
             if (summary.maintenance.upcoming.length) {
-                box.appendChild(section('Maintenances à venir', summary.maintenance.upcoming.length));
+                box.appendChild(section(text(L, 'h_upcoming'), summary.maintenance.upcoming.length));
                 summary.maintenance.upcoming.forEach(function (m) { box.appendChild(maintenanceRow(m, false, now)); });
             }
             if (summary.announcements.length) {
-                box.appendChild(section('Annonces', summary.announcements.length));
+                box.appendChild(section(text(L, 'h_announcements'), summary.announcements.length));
                 summary.announcements.forEach(function (a) { box.appendChild(announcementRow(a)); });
             }
         }
@@ -529,14 +649,14 @@
         var foot = el('div', 'jellyportal-foot');
         var url = summary && summary.portal ? safePortalUrl(summary.portal.url) : null;
         if (url) {
-            var link = el('a', 'jellyportal-link', 'Ouvrir le status portal');
+            var link = el('a', 'jellyportal-link', text(L, 'link_open'));
             link.href = url;
             link.target = '_blank';
             link.rel = 'noopener noreferrer';
             foot.appendChild(link);
         }
         if (model.fetchedAt) {
-            foot.appendChild(el('span', 'jellyportal-updated', 'Mis à jour à ' + new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(model.fetchedAt))));
+            foot.appendChild(el('span', 'jellyportal-updated', text(L, 'foot_updated', [timeOfDay(model.fetchedAt, undefined, L)])));
         }
         box.appendChild(foot);
         return box;
@@ -568,7 +688,7 @@
         if (!icon || model.open) { return; }
         bubble = el('div', 'jellyportal-bubble');
         bubble.setAttribute('role', 'dialog');
-        bubble.setAttribute('aria-label', 'État des services');
+        bubble.setAttribute('aria-label', text(lang(), 'aria_bubble'));
         bubble.appendChild(el('div', 'jellyportal-arrow'));
         bubble.appendChild(el('div', 'jellyportal-scroll'));
         document.body.appendChild(bubble);
@@ -596,6 +716,7 @@
 
     function applySummary(summary) {
         model.summary = summary;
+        if (summary.language) { model.language = summary.language; }
         model.fetchedAt = Date.now();
         model.skew = clockSkew(summary.now, model.fetchedAt);
         paintIcon();
