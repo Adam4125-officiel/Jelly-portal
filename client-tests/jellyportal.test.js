@@ -165,6 +165,15 @@ test('only a plain http(s) address is ever linked', () => {
     }
 });
 
+// ---- the playback page -----------------------------------------------------------------------------------------------
+
+test('the playback page is recognised by its route, and only by it', () => {
+    for (const hash of ['#/video', '#/video?x=1', '#video', '#/video/']) { assert.equal(c.isPlayerRoute(hash), true, hash); }
+    for (const hash of ['', '#/home', '#/videos', '#/details?id=1', '#/video-player', '#/queue', undefined, null]) {
+        assert.equal(c.isPlayerRoute(hash), false, String(hash));
+    }
+});
+
 // ---- where the bubble goes ------------------------------------------------------------------------------------------
 
 const icon = (left, top = 1, size = 46) => ({ left, top, right: left + size, bottom: top + size });

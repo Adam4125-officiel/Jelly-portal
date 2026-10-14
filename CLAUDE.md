@@ -148,7 +148,8 @@ One script and one stylesheet, embedded in the plugin: `Web/jellyportal.js` (IIF
 load: a test forbids `@import`, `url(` and any other host) and `Web/jellyportal.css`. Its pure helpers
 (durations, local times, clock skew, bubble placement, French wording) are exported when it is loaded as a
 CommonJS module, and tested with Node's own runner: `node --test client-tests/*.test.js` (CI runs it in the
-`Client JS syntax` job). The DOM part is covered by the end-to-end scripts in `dev/e2e/`.
+`Client JS syntax` job). The DOM part is covered by the end-to-end scripts in `dev/e2e/` (`bubble.py`, `behaviour.py`, `config_page.py`,
+and `player.py`, which plays a real clip: it makes a short VP9 file and a throw-away "Test" library in the dev Jellyfin itself).
 
 - **Where the icon goes, read from the real DOM** of `refs/jellyfin-web` v12.2 and confirmed live. *Modern*
   (the default, `layout` unset or `modern` in `localStorage`): `header.MuiAppBar-root > .MuiToolbar-root` holds
@@ -158,7 +159,26 @@ CommonJS module, and tested with Node's own runner: `node --test client-tests/*.
   hidden, in Modern, which is why Modern is looked for first. `localStorage.layout` is how a test selects one.
 - **A `MutationObserver` on the body re-runs one idempotent `ensureIcon()`** (throttled with
   `requestAnimationFrame`): one icon, in the right place, rebuilt if the header was re-rendered or the layout
-  changed, removed when there is no header (login page, video player) or the user is not signed in.
+  changed, removed when there is no header (the login page) or the user is not signed in.
+- **The playback page has a header of its own, and the icon is in it** (owner's request, 2026-10-14, after he saw it
+  missing there). Read from `refs/jellyfin-web` v12.2 and confirmed live with a real clip: in *Modern* the playback
+  route renders its own `Box.skinHeader.osdHeader` holding an `AppToolbar` (class `videoOsd-appBar`) with the back
+  button, the title and a buttons box (SyncPlay, cast) and **no user menu**, so the avatar-based anchor does not exist
+  there; the icon is put first in that buttons box. In *Legacy* it is the ordinary `.skinHeader .headerRight` with the
+  class `osdHeader` added, and jellyfin-web's `.osdHeader .headerButton:not(back/cast/sync) { display: none }` hid the
+  icon, which is why `.osdHeader .jellyportal-btn` is `display: inline-flex !important` (the specificity cannot be
+  matched without copying five classes). The header fades out by itself after 3 s without a pointer move; the icon
+  fades with it and returns with it, and **an open bubble deliberately stays open** (it is not tied to the controls).
+  Two interactions with the player, both handled and both tested live. jellyfin-web pauses (mouse) or toggles the
+  controls (touch) on the **`pointerdown`** on the picture, not on `click`, so a press outside the bubble on the
+  playback page is stopped at the window unless it lands on a control (stopping the `click` was tried first and
+  paused the video anyway: `dev/e2e/player.py` caught it). And **Escape**: its own handler on the playback page hides
+  the player's controls, so the bubble's Escape handler is on the window in the capture phase with
+  `stopImmediatePropagation()`, and closing the bubble is all that press does. **Do not read more into that**: an
+  earlier version of this note said Escape *leaves the video*, which is false on a desktop layout (jellyfin-web sends
+  the `back` command for Escape only in the TV layout); it was caught because the mutation that removed the handler
+  left the test green, which is what made the test be rewritten around the controls actually staying shown. The icon's 41 px size is keyed on the legacy icon
+  (`[data-jellyportal-icon="legacy"]`), not on `.skinHeader`, which the Modern playback header carries too.
 - **Authentication and errors**: `window.ApiClient.ajax` (the page's own token). 401 removes the icon; **403
   (administrators only) stops everything for that page and logs nothing**; any other failure shows the grey
   state with "Impossible de contacter le serveur Jellyfin" and keeps polling.
