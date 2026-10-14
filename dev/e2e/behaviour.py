@@ -17,10 +17,14 @@ from zoneinfo import ZoneInfo
 sys.path.insert(0, str(Path(__file__).parent))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import jf  # noqa: E402
-from common import BASE, SHOTS, Recorder, chrome, login  # noqa: E402
+from common import BASE, LANGUAGE, SHOTS, Recorder, chrome, login, set_language  # noqa: E402
 from playwright.sync_api import sync_playwright  # noqa: E402
 
 FAKE = "http://172.17.0.1:8099"
+# The wording this run checks (JP_LANG, English by default).
+OUTAGE = {"en": "refuses the configured API key", "fr": "refuse la cl\u00e9 API"}[LANGUAGE]
+DAYS = {"en": ("today", "tomorrow", "at"), "fr": ("aujourd\u2019hui", "demain", "\u00e0")}[LANGUAGE]
+ALL_OK = {"en": "All services are operational", "fr": "Tous les services fonctionnent"}
 ICON = "[data-jellyportal-icon]"
 failures: list[str] = []
 passes = 0
@@ -77,6 +81,7 @@ def set_hidden(page, hidden: bool) -> None:
 
 
 config(adminsOnly=False, pollSeconds=10, cacheSeconds=5)
+set_language()
 scenario("ok")
 time.sleep(6)
 
@@ -171,7 +176,7 @@ with sync_playwright() as p:
     wait_icon(page, "unknown")
     page.click(ICON)
     page.wait_for_selector(".jellyportal-bubble")
-    check("refuse la clé API" in page.text_content(".jellyportal-bubble"), "an outage says why, in words")
+    check(OUTAGE in page.text_content(".jellyportal-bubble"), "an outage says why, in words")
     page.keyboard.press("Escape")
     scenario("down")
     t0 = time.time()
@@ -226,8 +231,8 @@ with sync_playwright() as p:
         for drift in (0, 60, -60):
             local = (datetime.fromisoformat(start.replace("Z", "+00:00")) + timedelta(seconds=drift)).astimezone(ZoneInfo(zone))
             now_local = datetime.now(ZoneInfo(zone))
-            day = "aujourd’hui" if local.date() == now_local.date() else "demain" if (local.date() - now_local.date()).days == 1 else None
-            wanted.append(f"{day} à {local:%H:%M}" if day else f"{local:%H:%M}")
+            day = DAYS[0] if local.date() == now_local.date() else DAYS[1] if (local.date() - now_local.date()).days == 1 else None
+            wanted.append(f"{day} {DAYS[2]} {local:%H:%M}" if day else f"{local:%H:%M}")
         check(any(w in text for w in wanted), f"time zone {zone}: the maintenance reads one of {wanted[0]!r} (±1 min)")
         ctx.close()
     scenario("ok")
@@ -254,6 +259,27 @@ with sync_playwright() as p:
               f"[{label}] the summary carries exactly the public address ({public or 'null'})")
         ctx.close()
     config(publicUrl="https://status.dev.example")
+
+    # ---------------------------------------------------------------- the language: a setting, or each viewer's own
+    scenario("ok")
+    for setting, locale, expected in (("auto", "fr-FR", "fr"), ("auto", "en-US", "en"), ("auto", "de-DE", "en"),
+                                      ("fr", "en-US", "fr"), ("en", "fr-FR", "en")):
+        config(language=setting)
+        ctx = browser.new_context(viewport={"width": 1280, "height": 800}, locale=locale)
+        ctx.add_init_script("localStorage.setItem('layout', 'modern')")
+        page = ctx.new_page()
+        rec = Recorder(page)
+        login(page)
+        wait_icon(page, "ok")
+        page.click(ICON)
+        page.wait_for_selector(".jellyportal-bubble")
+        body = page.text_content(".jellyportal-bubble")
+        label = page.get_attribute(ICON, "aria-label")
+        check(ALL_OK[expected] in body and label.startswith({"en": "Service status", "fr": "\u00c9tat des services"}[expected]),
+              f"[setting {setting}, browser in {locale}] the bubble and the icon's label speak {'French' if expected == 'fr' else 'English'}")
+        check(rec.problems_of_ours() == [], f"[setting {setting}, browser in {locale}] nothing of ours in the console")
+        ctx.close()
+    set_language()
 
     # ---------------------------------------------------------------- giving way to Jellyfin's own header menus
     scenario("busy")

@@ -44,6 +44,7 @@ Dashboard > Plugins > **Jelly Portal** (also in the dashboard sidebar). Changes 
 | Public address of the portal, the one the bubble's "open the status portal" link points to (`https://status.example.com`). Optional | none: no link |
 | Key of the portal's **Display device** API (portal administration, page *Display device*) | none |
 | Visible to | all users / administrators only |
+| Language of the bubble and of this page: **English**, **Français**, or **Auto** (each user's own Jellyfin language, and English when that is not French) | English |
 | Priority services (one name per line): their maintenance and incidents are put forward in the bubble | none |
 | "Maintenance coming up" window (1 h to 30 days) | 24 h |
 | Browser refresh interval (10 s to 1 h) | 60 s |
@@ -88,8 +89,8 @@ minus 16 px), never full screen.
 | ![Bubble, Modern layout](docs/images/bubble-modern.png) | ![Bubble, Legacy layout](docs/images/bubble-legacy.png) | ![Bubble on a phone](docs/images/bubble-phone.png) |
 
 It lists the services that are down, then the open incidents, the other services, the maintenance in progress (with the
-time left), the maintenance to come (a countdown such as "dans 3 h", the priority ones first) and the announcements.
-Times are shown in the time zone of the browser, in French. A long list of healthy services is folded behind one line
+time left), the maintenance to come (a countdown such as "in 3 h", the priority ones first) and the announcements.
+Times are shown in the time zone of the browser, in the language of the bubble (English or French). A long list of healthy services is folded behind one line
 when there is something else to read. The page refreshes by itself at the configured interval, pauses while the tab is
 hidden and refreshes at once when you come back.
 

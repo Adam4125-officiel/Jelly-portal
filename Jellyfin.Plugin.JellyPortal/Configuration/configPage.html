@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="en">
 <head>
     <meta charset="utf-8">
     <title>Jelly Portal</title>
@@ -9,69 +9,75 @@
         <div data-role="content">
             <div class="content-primary">
                 <h2 class="sectionTitle">Jelly Portal</h2>
-                <p class="fieldDescription">
-                    Affiche dans l'en-tête du client web l'état de vos services, tel que le rapporte votre status portal.
-                    Les modifications s'appliquent immédiatement, sans redémarrer Jellyfin.
-                </p>
+                <p class="fieldDescription" data-t="intro"></p>
 
                 <div id="jpFileTransformation" class="fieldDescription" role="status" style="margin-bottom: 1.5em;"></div>
 
                 <form id="jpForm" autocomplete="off">
                     <h3 class="sectionTitle">Status portal</h3>
                     <div class="inputContainer">
-                        <label class="inputLabel inputLabelUnfocused" for="jpPortalUrl">Adresse du portal</label>
+                        <label class="inputLabel inputLabelUnfocused" for="jpPortalUrl" data-t="portal_url_label"></label>
                         <input id="jpPortalUrl" name="portalUrl" type="text" is="emby-input" placeholder="http://192.168.1.10:5000" />
-                        <div class="fieldDescription">L'adresse que le serveur Jellyfin utilise pour joindre le portal (pas forcément celle de votre navigateur). Sans identifiant ni paramètres.</div>
+                        <div class="fieldDescription" data-t="portal_url_hint"></div>
                     </div>
                     <div class="inputContainer">
-                        <label class="inputLabel inputLabelUnfocused" for="jpPublicUrl">Adresse publique du portal (lien de la bulle)</label>
+                        <label class="inputLabel inputLabelUnfocused" for="jpPublicUrl" data-t="public_url_label"></label>
                         <input id="jpPublicUrl" name="publicUrl" type="text" is="emby-input" placeholder="https://status.example.com" />
-                        <div class="fieldDescription">Facultatif. L'adresse que vos utilisateurs ouvrent avec le lien « Ouvrir le status portal » de la bulle, par exemple celle que vous leur donnez d'habitude. Laissée vide, la bulle n'a pas de lien. Ce n'est pas l'adresse ci-dessus : celle-là reste sur le serveur et n'est jamais envoyée à un navigateur.</div>
+                        <div class="fieldDescription" data-t="public_url_hint"></div>
                     </div>
                     <div class="inputContainer">
-                        <label class="inputLabel inputLabelUnfocused" for="jpApiKey">Clé de l'API « Display device » du portal</label>
+                        <label class="inputLabel inputLabelUnfocused" for="jpApiKey" data-t="api_key_label"></label>
                         <input id="jpApiKey" name="apiKey" type="password" is="emby-input" autocomplete="new-password" />
-                        <div class="fieldDescription" id="jpApiKeyHint">Dans l'administration du portal : page Display device. La clé reste sur le serveur et n'est jamais envoyée à un navigateur.</div>
-                        <button id="jpClearKey" is="emby-button" type="button" class="raised emby-button hide" style="margin-top: 0.5em;"><span>Effacer la clé enregistrée</span></button>
+                        <div class="fieldDescription" id="jpApiKeyHint" data-t="api_key_hint"></div>
+                        <button id="jpClearKey" is="emby-button" type="button" class="raised emby-button hide" style="margin-top: 0.5em;"><span data-t="clear_key"></span></button>
                     </div>
                     <div>
-                        <button id="jpTest" is="emby-button" type="button" class="raised emby-button"><span>Tester la connexion</span></button>
+                        <button id="jpTest" is="emby-button" type="button" class="raised emby-button"><span data-t="test"></span></button>
                         <div id="jpTestResult" class="fieldDescription" role="status" style="margin-top: 0.75em;"></div>
                     </div>
 
-                    <h3 class="sectionTitle" style="margin-top: 2em;">Affichage</h3>
+                    <h3 class="sectionTitle" style="margin-top: 2em;" data-t="h_display"></h3>
                     <div class="selectContainer">
-                        <label class="selectLabel" for="jpAdminsOnly">Visible par</label>
+                        <label class="selectLabel" for="jpAdminsOnly" data-t="visible_to"></label>
                         <select is="emby-select" id="jpAdminsOnly" name="adminsOnly" class="emby-select-withcolor emby-select">
-                            <option value="false">Tous les utilisateurs</option>
-                            <option value="true">Les administrateurs seulement</option>
+                            <option value="false" data-t="visible_all"></option>
+                            <option value="true" data-t="visible_admins"></option>
                         </select>
                     </div>
+                    <div class="selectContainer">
+                        <label class="selectLabel" for="jpLanguage" data-t="language_label"></label>
+                        <select is="emby-select" id="jpLanguage" name="language" class="emby-select-withcolor emby-select">
+                            <option value="en">English</option>
+                            <option value="fr">Français</option>
+                            <option value="auto" data-t="language_auto"></option>
+                        </select>
+                        <div class="fieldDescription" data-t="language_hint"></div>
+                    </div>
                     <div class="inputContainer">
-                        <label class="inputLabel inputLabelUnfocused" for="jpPriority">Services prioritaires</label>
+                        <label class="inputLabel inputLabelUnfocused" for="jpPriority" data-t="priority_label"></label>
                         <textarea id="jpPriority" name="priorityServices" is="emby-textarea" rows="4" class="emby-textarea" style="width: 100%;" placeholder="Jellyfin"></textarea>
-                        <div class="fieldDescription">Un nom par ligne, tel qu'il s'écrit dans le portal (majuscules sans importance). Leurs maintenances et incidents sont mis en avant dans la bulle.</div>
+                        <div class="fieldDescription" data-t="priority_hint"></div>
                     </div>
 
-                    <h3 class="sectionTitle" style="margin-top: 2em;">Actualisation</h3>
+                    <h3 class="sectionTitle" style="margin-top: 2em;" data-t="h_refresh"></h3>
                     <div class="inputContainer">
-                        <label class="inputLabel inputLabelUnfocused" for="jpSoon">Fenêtre « maintenance à venir » (heures)</label>
+                        <label class="inputLabel inputLabelUnfocused" for="jpSoon" data-t="soon_label"></label>
                         <input id="jpSoon" name="soonWindowHours" type="number" is="emby-input" />
-                        <div class="fieldDescription" id="jpSoonHint">Une maintenance prévue dans cette fenêtre fait apparaître le badge horloge.</div>
+                        <div class="fieldDescription" id="jpSoonHint" data-t="soon_hint"></div>
                     </div>
                     <div class="inputContainer">
-                        <label class="inputLabel inputLabelUnfocused" for="jpPoll">Actualisation dans le navigateur (secondes)</label>
+                        <label class="inputLabel inputLabelUnfocused" for="jpPoll" data-t="poll_label"></label>
                         <input id="jpPoll" name="pollSeconds" type="number" is="emby-input" />
-                        <div class="fieldDescription" id="jpPollHint">Un onglet masqué n'interroge pas le serveur.</div>
+                        <div class="fieldDescription" id="jpPollHint" data-t="poll_hint"></div>
                     </div>
                     <div class="inputContainer">
-                        <label class="inputLabel inputLabelUnfocused" for="jpCache">Durée du cache serveur (secondes)</label>
+                        <label class="inputLabel inputLabelUnfocused" for="jpCache" data-t="cache_label"></label>
                         <input id="jpCache" name="cacheSeconds" type="number" is="emby-input" />
-                        <div class="fieldDescription" id="jpCacheHint">Quel que soit le nombre de navigateurs ouverts, le portal n'est interrogé qu'une fois par cette durée.</div>
+                        <div class="fieldDescription" id="jpCacheHint" data-t="cache_hint"></div>
                     </div>
 
                     <div style="margin-top: 2em;">
-                        <button is="emby-button" type="submit" class="raised button-submit block emby-button"><span>Enregistrer</span></button>
+                        <button is="emby-button" type="submit" class="raised button-submit block emby-button"><span data-t="save"></span></button>
                         <div id="jpSaveResult" class="fieldDescription" role="status" style="margin-top: 0.75em;"></div>
                     </div>
                 </form>
@@ -85,6 +91,150 @@
                 var page = document.querySelector('#JellyPortalConfigPage');
                 var $ = function (id) { return page.querySelector('#' + id); };
                 var clearKey = false;
+                var current = {};     // what the last answer of the server said, to rewrite the dynamic texts in another language
+                var shown = {};       // the last message put in each status area, as { key, args, bad }, for the same reason
+
+                // The page's texts, in both languages, with exactly the same keys (a test checks it). {0}, {1}: arguments.
+                // The server sends codes and numbers, never sentences: the wording lives here.
+                /*T-begin*/
+                var T = {
+                    en: {
+                        intro: 'Shows the state of your services, as reported by your status portal, in the header of the web client. Changes apply immediately, without restarting Jellyfin.',
+                        portal_url_label: 'Portal address',
+                        portal_url_hint: 'The address the Jellyfin server uses to reach the portal (not necessarily the one your browser uses). No credentials, no parameters.',
+                        public_url_label: 'Public portal address (the bubble’s link)',
+                        public_url_hint: 'Optional. The address your users open with the bubble’s “Open the status portal” link, for example the one you usually give them. Left empty, the bubble has no link. This is not the address above: that one stays on the server and is never sent to a browser.',
+                        api_key_label: 'Key of the portal’s “Display device” API',
+                        api_key_hint: 'In the portal’s administration: the Display device page. The key stays on the server and is never sent to a browser.',
+                        clear_key: 'Clear the saved key',
+                        test: 'Test the connection',
+                        h_display: 'Display',
+                        visible_to: 'Visible to',
+                        visible_all: 'All users',
+                        visible_admins: 'Administrators only',
+                        language_label: 'Language',
+                        language_auto: 'Auto (each user’s Jellyfin language)',
+                        language_hint: 'The language of the bubble and of this page. “Auto” follows each user’s own Jellyfin language, and is English when that is not French.',
+                        priority_label: 'Priority services',
+                        priority_hint: 'One name per line, as written in the portal (case does not matter). Their maintenance and incidents are put forward in the bubble.',
+                        h_refresh: 'Refresh',
+                        soon_label: '“Maintenance coming up” window (hours)',
+                        soon_hint: 'A maintenance planned within this window makes the clock badge appear.',
+                        poll_label: 'Refresh in the browser (seconds)',
+                        poll_hint: 'A hidden tab does not ask the server.',
+                        cache_label: 'Server cache lifetime (seconds)',
+                        cache_hint: 'However many browsers are open, the portal is asked once per this duration.',
+                        save: 'Save',
+                        saved: 'Saved.',
+                        testing: 'Testing…',
+                        generic_error: 'Something went wrong (see the browser console).',
+                        key_saved: '•••••••• (key saved, leave empty to keep it)',
+                        key_will_clear: 'The key will be erased when you save.',
+                        ft_registered: 'File Transformation is installed: the icon will be added to the web client’s header.',
+                        ft_not_installed: 'File Transformation is not installed: without it, the icon cannot be added to the header. Install it from the catalog (repository https://www.iamparadox.dev/jellyfin/plugins/manifest.json), then restart Jellyfin.',
+                        ft_incompatible: 'The installed version of File Transformation is not supported: the icon cannot be added. Install the 3.x version that matches your Jellyfin.',
+                        ft_failed: 'File Transformation refused the registration: the icon cannot be added. See the server log ([JellyPortal] lines).',
+                        ft_unknown: 'File Transformation’s state is not known yet.',
+                        test_ok_one: 'Connection successful: the portal “{0}” tracks {1} service.',
+                        test_ok_many: 'Connection successful: the portal “{0}” tracks {1} services.',
+                        reason_not_configured: 'Enter the portal’s address and the API key.',
+                        reason_device_api_disabled: 'The portal answers 404: its “Display device” API is switched off (in the portal’s administration, Display device page), or this is not the portal’s address.',
+                        reason_bad_api_key: 'The portal refuses the API key (401). Copy the key shown in the portal’s administration, Display device page.',
+                        reason_unreachable: 'The portal cannot be reached. Check the address and port, and that the Jellyfin server can reach that machine.',
+                        reason_timeout: 'The portal does not answer within 5 seconds.',
+                        reason_bad_response: 'The portal answered something unexpected. Check that the address really is the status portal’s (and not a proxy’s or another application’s).',
+                        reason_portal_outdated: 'This portal is too old: version 1.12.0 or newer is required (the detail=full parameter).',
+                        reason_invalid_portal_url: 'The portal address is not valid. It must start with http:// or https://, with no credentials and no parameters (for example http://192.168.1.10:5000).',
+                        reason_invalid_public_url: 'The public address is not valid. It must start with http:// or https://, with no credentials and no parameters (for example https://status.example.com).',
+                        reason_invalid_language: 'That language is not available.'
+                    },
+                    fr: {
+                        intro: 'Affiche dans l’en-tête du client web l’état de vos services, tel que le rapporte votre status portal. Les modifications s’appliquent immédiatement, sans redémarrer Jellyfin.',
+                        portal_url_label: 'Adresse du portal',
+                        portal_url_hint: 'L’adresse que le serveur Jellyfin utilise pour joindre le portal (pas forcément celle de votre navigateur). Sans identifiant ni paramètres.',
+                        public_url_label: 'Adresse publique du portal (lien de la bulle)',
+                        public_url_hint: 'Facultatif. L’adresse que vos utilisateurs ouvrent avec le lien « Ouvrir le status portal » de la bulle, par exemple celle que vous leur donnez d’habitude. Laissée vide, la bulle n’a pas de lien. Ce n’est pas l’adresse ci-dessus : celle-là reste sur le serveur et n’est jamais envoyée à un navigateur.',
+                        api_key_label: 'Clé de l’API « Display device » du portal',
+                        api_key_hint: 'Dans l’administration du portal : page Display device. La clé reste sur le serveur et n’est jamais envoyée à un navigateur.',
+                        clear_key: 'Effacer la clé enregistrée',
+                        test: 'Tester la connexion',
+                        h_display: 'Affichage',
+                        visible_to: 'Visible par',
+                        visible_all: 'Tous les utilisateurs',
+                        visible_admins: 'Les administrateurs seulement',
+                        language_label: 'Langue',
+                        language_auto: 'Auto (langue Jellyfin de chaque utilisateur)',
+                        language_hint: 'La langue de la bulle et de cette page. « Auto » suit la langue Jellyfin de chaque utilisateur, et passe en anglais quand ce n’est pas le français.',
+                        priority_label: 'Services prioritaires',
+                        priority_hint: 'Un nom par ligne, tel qu’il s’écrit dans le portal (majuscules sans importance). Leurs maintenances et incidents sont mis en avant dans la bulle.',
+                        h_refresh: 'Actualisation',
+                        soon_label: 'Fenêtre « maintenance à venir » (heures)',
+                        soon_hint: 'Une maintenance prévue dans cette fenêtre fait apparaître le badge horloge.',
+                        poll_label: 'Actualisation dans le navigateur (secondes)',
+                        poll_hint: 'Un onglet masqué n’interroge pas le serveur.',
+                        cache_label: 'Durée du cache serveur (secondes)',
+                        cache_hint: 'Quel que soit le nombre de navigateurs ouverts, le portal n’est interrogé qu’une fois par cette durée.',
+                        save: 'Enregistrer',
+                        saved: 'Enregistré.',
+                        testing: 'Test en cours…',
+                        generic_error: 'Une erreur est survenue (voir la console du navigateur).',
+                        key_saved: '•••••••• (clé enregistrée, laissez vide pour la conserver)',
+                        key_will_clear: 'La clé sera effacée à l’enregistrement.',
+                        ft_registered: 'File Transformation est installé : l’icône sera ajoutée à l’en-tête du client web.',
+                        ft_not_installed: 'File Transformation n’est pas installé : sans lui, l’icône ne peut pas être ajoutée à l’en-tête. Installez-le depuis le catalogue (dépôt https://www.iamparadox.dev/jellyfin/plugins/manifest.json) puis redémarrez Jellyfin.',
+                        ft_incompatible: 'La version de File Transformation installée n’est pas prise en charge : l’icône ne peut pas être ajoutée. Installez la version 3.x correspondant à votre Jellyfin.',
+                        ft_failed: 'File Transformation a refusé l’enregistrement : l’icône ne peut pas être ajoutée. Voir le journal du serveur (lignes [JellyPortal]).',
+                        ft_unknown: 'État de File Transformation inconnu pour le moment.',
+                        test_ok_one: 'Connexion réussie : le portal « {0} » suit {1} service.',
+                        test_ok_many: 'Connexion réussie : le portal « {0} » suit {1} services.',
+                        reason_not_configured: 'Renseignez l’adresse du portal et la clé API.',
+                        reason_device_api_disabled: 'Le portal répond 404 : son API « Display device » est désactivée (dans l’administration du portal, page Display device), ou cette adresse n’est pas celle du portal.',
+                        reason_bad_api_key: 'Le portal refuse la clé API (401). Copiez la clé affichée dans l’administration du portal, page Display device.',
+                        reason_unreachable: 'Impossible de joindre le portal. Vérifiez l’adresse et le port, et que le serveur Jellyfin peut atteindre cette machine.',
+                        reason_timeout: 'Le portal ne répond pas dans les 5 secondes.',
+                        reason_bad_response: 'Le portal a répondu quelque chose d’inattendu. Vérifiez que l’adresse est bien celle du status portal (et pas celle d’un proxy ou d’une autre application).',
+                        reason_portal_outdated: 'Ce portal est trop ancien : il faut la version 1.12.0 ou plus récente (paramètre detail=full).',
+                        reason_invalid_portal_url: 'L’adresse du portal n’est pas valide. Elle doit commencer par http:// ou https://, sans identifiant, sans paramètres (par exemple http://192.168.1.10:5000).',
+                        reason_invalid_public_url: 'L’adresse publique n’est pas valide. Elle doit commencer par http:// ou https://, sans identifiant, sans paramètres (par exemple https://status.example.com).',
+                        reason_invalid_language: 'Cette langue n’est pas disponible.'
+                    }
+                };
+                /*T-end*/
+
+                // 'en', 'fr' or 'auto' (what the dashboard itself is displayed in, which jellyfin-web writes to <html lang>).
+                function resolve(setting) {
+                    if (setting === 'fr' || setting === 'en') { return setting; }
+                    return /^fr(?:[-_]|$)/i.test(String(document.documentElement.getAttribute('lang') || '')) ? 'fr' : 'en';
+                }
+
+                var language = resolve('auto');
+
+                function t(key, args) {
+                    var value = (T[language] && T[language][key] !== undefined) ? T[language][key] : T.en[key];
+                    if (value === undefined) { return key; }
+                    return value.replace(/\{(\d+)\}/g, function (whole, index) { return args && args[Number(index)] !== undefined ? args[Number(index)] : whole; });
+                }
+
+                // Every message shown in a status area is kept as a key, so a change of language rewrites it too.
+                function say(id, key, args, bad) {
+                    var el = $(id);
+                    shown[id] = key ? { key: key, args: args, bad: !!bad } : null;
+                    el.textContent = key ? t(key, args) : '';
+                    el.style.color = bad ? '#e57373' : '';
+                }
+
+                function render() {
+                    Array.prototype.forEach.call(page.querySelectorAll('[data-t]'), function (el) { el.textContent = t(el.getAttribute('data-t')); });
+                    Object.keys(shown).forEach(function (id) { if (shown[id]) { $(id).textContent = t(shown[id].key, shown[id].args); } });
+                    if (clearKey) { $('jpApiKey').placeholder = t('key_will_clear'); }
+                    else { $('jpApiKey').placeholder = current.hasApiKey ? t('key_saved') : ''; }
+                    document.documentElement.setAttribute('data-jellyportal-page-language', language);
+                }
+
+                function setLanguage(setting) {
+                    language = resolve(setting);
+                    render();
+                }
 
                 // Same endpoints for everything: the generic plugin-configuration API is deliberately not used, because
                 // it would hand the portal API key to this page, and posting the whole object back would erase it.
@@ -98,30 +248,25 @@
                     });
                 }
 
-                function say(id, text, bad) {
-                    var el = $(id);
-                    el.textContent = text || '';
-                    el.style.color = bad ? '#e57373' : '';
-                }
-
-                function fileTransformationText(code) {
+                function fileTransformation(code) {
                     switch (code) {
-                        case 'registered': return ['File Transformation est installé : l\'icône sera ajoutée à l\'en-tête du client web.', false];
-                        case 'not_installed': return ['File Transformation n\'est pas installé : sans lui, l\'icône ne peut pas être ajoutée à l\'en-tête. Installez-le depuis le catalogue (dépôt https://www.iamparadox.dev/jellyfin/plugins/manifest.json) puis redémarrez Jellyfin.', true];
-                        case 'incompatible': return ['La version de File Transformation installée n\'est pas prise en charge : l\'icône ne peut pas être ajoutée. Installez la version 3.x correspondant à votre Jellyfin.', true];
-                        case 'failed': return ['File Transformation a refusé l\'enregistrement : l\'icône ne peut pas être ajoutée. Voir le journal du serveur (lignes [JellyPortal]).', true];
-                        default: return ['État de File Transformation inconnu pour le moment.', false];
+                        case 'registered': return ['ft_registered', false];
+                        case 'not_installed': return ['ft_not_installed', true];
+                        case 'incompatible': return ['ft_incompatible', true];
+                        case 'failed': return ['ft_failed', true];
+                        default: return ['ft_unknown', false];
                     }
                 }
 
                 function fill(config) {
+                    current = config;
                     $('jpPortalUrl').value = config.portalUrl || '';
                     $('jpPublicUrl').value = config.publicUrl || '';
                     $('jpApiKey').value = '';
-                    $('jpApiKey').placeholder = config.hasApiKey ? '•••••••• (clé enregistrée, laissez vide pour la conserver)' : '';
                     $('jpClearKey').classList.toggle('hide', !config.hasApiKey);
                     clearKey = false;
                     $('jpAdminsOnly').value = config.adminsOnly ? 'true' : 'false';
+                    $('jpLanguage').value = config.language || 'en';
                     $('jpPriority').value = config.priorityServices || '';
                     var ranges = config.ranges || {};
                     [['jpSoon', 'soonWindowHours', config.soonWindowHours], ['jpPoll', 'pollSeconds', config.pollSeconds], ['jpCache', 'cacheSeconds', config.cacheSeconds]].forEach(function (row) {
@@ -134,8 +279,9 @@
                             input.placeholder = String(range['default']);
                         }
                     });
-                    var ft = fileTransformationText(config.fileTransformation);
-                    say('jpFileTransformation', ft[0], ft[1]);
+                    var ft = fileTransformation(config.fileTransformation);
+                    setLanguage(config.language);
+                    say('jpFileTransformation', ft[0], null, ft[1]);
                 }
 
                 function form() {
@@ -149,6 +295,7 @@
                         apiKey: $('jpApiKey').value.trim() || null,
                         clearApiKey: clearKey,
                         adminsOnly: $('jpAdminsOnly').value === 'true',
+                        language: $('jpLanguage').value,
                         priorityServices: $('jpPriority').value,
                         soonWindowHours: number('jpSoon'),
                         pollSeconds: number('jpPoll'),
@@ -156,12 +303,14 @@
                     };
                 }
 
+                // A code the server sent (a failure reason, or a refused value) as the sentence for it; anything else is generic.
+                function reasonKey(code) { return code && T.en['reason_' + code] !== undefined ? 'reason_' + code : 'generic_error'; }
+
                 function failure(error, target) {
-                    var fallback = 'Une erreur est survenue (voir la console du navigateur).';
                     if (error && typeof error.json === 'function') {
-                        error.json().then(function (body) { say(target, (body && body.error) || fallback, true); }, function () { say(target, fallback, true); });
+                        error.json().then(function (body) { say(target, reasonKey(body && body.error), null, true); }, function () { say(target, 'generic_error', null, true); });
                     } else {
-                        say(target, fallback, true);
+                        say(target, 'generic_error', null, true);
                     }
                     // A refused value (HTTP 400) is a normal answer, already shown in words; only a real failure is logged.
                     if (!(error && error.status === 400)) {
@@ -169,33 +318,42 @@
                     }
                 }
 
+                render();
+
                 page.addEventListener('pageshow', function () {
-                    say('jpSaveResult', '');
-                    say('jpTestResult', '');
+                    say('jpSaveResult');
+                    say('jpTestResult');
                     Dashboard.showLoadingMsg();
                     call('GET', 'Config').then(fill, function (e) { failure(e, 'jpSaveResult'); }).then(Dashboard.hideLoadingMsg, Dashboard.hideLoadingMsg);
                 });
 
+                // The language is previewed as soon as it is chosen; it is only kept when the form is saved.
+                $('jpLanguage').addEventListener('change', function () { setLanguage($('jpLanguage').value); });
+
                 $('jpClearKey').addEventListener('click', function () {
                     clearKey = true;
                     $('jpApiKey').value = '';
-                    $('jpApiKey').placeholder = 'La clé sera effacée à l\'enregistrement.';
+                    $('jpApiKey').placeholder = t('key_will_clear');
                 });
 
                 $('jpTest').addEventListener('click', function () {
-                    say('jpTestResult', 'Test en cours…');
+                    say('jpTestResult', 'testing');
                     call('POST', 'Config/Test', form()).then(function (result) {
-                        say('jpTestResult', result.message, !result.ok);
+                        if (result.ok) {
+                            say('jpTestResult', result.services === 1 ? 'test_ok_one' : 'test_ok_many', [result.siteName || '', String(result.services)], false);
+                        } else {
+                            say('jpTestResult', reasonKey(result.reason), null, true);
+                        }
                     }, function (e) { failure(e, 'jpTestResult'); });
                 });
 
                 $('jpForm').addEventListener('submit', function (event) {
                     event.preventDefault();
-                    say('jpSaveResult', '');
+                    say('jpSaveResult');
                     Dashboard.showLoadingMsg();
                     call('POST', 'Config', form()).then(function (config) {
                         fill(config);
-                        say('jpSaveResult', 'Enregistré.');
+                        say('jpSaveResult', 'saved');
                     }, function (e) { failure(e, 'jpSaveResult'); }).then(Dashboard.hideLoadingMsg, Dashboard.hideLoadingMsg);
                     return false;
                 });

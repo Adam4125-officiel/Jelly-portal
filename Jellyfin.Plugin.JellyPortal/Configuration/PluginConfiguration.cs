@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 using Jellyfin.Plugin.JellyPortal.Portal;
+using Jellyfin.Plugin.JellyPortal.Summary;
 using MediaBrowser.Model.Plugins;
 
 namespace Jellyfin.Plugin.JellyPortal.Configuration;
@@ -45,8 +46,14 @@ public class PluginConfiguration : BasePluginConfiguration
     /// <summary>Gets or sets a value indicating whether only administrators see the icon.</summary>
     public bool AdminsOnly { get; set; }
 
+    /// <summary>
+    /// Gets or sets the language of the panel and of the settings page: en, fr, or auto (each viewer's own Jellyfin
+    /// language, English when it is not French). English by default.
+    /// </summary>
+    public string Language { get; set; } = Languages.Default;
+
     /// <summary>Returns the validated, clamped settings.</summary>
     /// <returns>The settings.</returns>
     public JellyPortalSettings ToSettings() => JellyPortalSettings.From(
-        PortalUrl, PublicUrl, ApiKey, PollSeconds, CacheSeconds, SoonWindowHours, PriorityServices, AdminsOnly);
+        PortalUrl, PublicUrl, ApiKey, PollSeconds, CacheSeconds, SoonWindowHours, PriorityServices, AdminsOnly, Language);
 }

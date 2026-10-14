@@ -73,19 +73,58 @@ public class ConventionsTests
         return Regex.Matches(block.Groups["body"].Value, @"^\s+(\w+):", RegexOptions.Multiline).Select(m => m.Groups[1].Value).ToList();
     }
 
+    private static readonly string[] ClientTables = ["TEXT_EN", "TEXT_FR"];
+
+    private static List<string> WithPrefix(string table, string prefix) =>
+        KeysOf(ClientScript(), table).Where(key => key.StartsWith(prefix, StringComparison.Ordinal)).Select(key => key[prefix.Length..]).OrderBy(x => x, StringComparer.Ordinal).ToList();
+
     [Fact]
-    public void TheClientKnowsEveryStateTheServerCanSend()
+    public void TheClientKnowsEveryStateTheServerCanSendInEveryLanguage()
     {
-        var wire = Enum.GetValues<Jellyfin.Plugin.JellyPortal.Summary.SummaryState>().Select(s => s.Name()).OrderBy(x => x, StringComparer.Ordinal);
-        Assert.Equal(wire, KeysOf(ClientScript(), "STATE_TITLES").OrderBy(x => x, StringComparer.Ordinal));
+        var wire = Enum.GetValues<Jellyfin.Plugin.JellyPortal.Summary.SummaryState>().Select(s => s.Name()).OrderBy(x => x, StringComparer.Ordinal).ToList();
+        foreach (var table in ClientTables)
+        {
+            Assert.Equal(wire, WithPrefix(table, "state_"));
+        }
     }
 
     [Fact]
-    public void TheClientHasASentenceForEveryReasonTheServerCanSend()
+    public void TheClientHasASentenceForEveryReasonTheServerCanSendInEveryLanguage()
     {
         // jellyfin_unreachable is the client's own: the Jellyfin server itself could not be asked.
-        var wire = Enum.GetValues<Jellyfin.Plugin.JellyPortal.Summary.SummaryFailure>().Select(f => f.Name()).Append("jellyfin_unreachable").OrderBy(x => x, StringComparer.Ordinal);
-        Assert.Equal(wire, KeysOf(ClientScript(), "REASON_TEXTS").OrderBy(x => x, StringComparer.Ordinal));
+        var wire = Enum.GetValues<Jellyfin.Plugin.JellyPortal.Summary.SummaryFailure>().Select(f => f.Name()).Append("jellyfin_unreachable").OrderBy(x => x, StringComparer.Ordinal).ToList();
+        foreach (var table in ClientTables)
+        {
+            Assert.Equal(wire, WithPrefix(table, "reason_"));
+        }
+    }
+
+    [Fact]
+    public void EveryLanguageOfTheClientHasTheSameSentencesAsTheOthers()
+    {
+        var english = KeysOf(ClientScript(), "TEXT_EN").OrderBy(x => x, StringComparer.Ordinal).ToList();
+        Assert.True(english.Count > 40);
+        Assert.Equal(english, KeysOf(ClientScript(), "TEXT_FR").OrderBy(x => x, StringComparer.Ordinal).ToList());
+    }
+
+    [Fact]
+    public void TheLanguagesTheServerAcceptsAreTheOnesTheClientAndThePageHave()
+    {
+        // "auto" is a choice, not a language: each of the others needs a table in the client, an entry in the page's
+        // texts and an option in the page's selector, and nothing else may be offered.
+        var page = File.ReadAllText(Path.Combine(RepoFiles.Root, "Jellyfin.Plugin.JellyPortal", "Configuration", "configPage.html"));
+        var languages = Jellyfin.Plugin.JellyPortal.Summary.Languages.All.Where(l => l != "auto").ToList();
+        Assert.Equal(["en", "fr"], languages);
+        foreach (var language in languages)
+        {
+            Assert.Contains("var TEXT_" + language.ToUpperInvariant() + " = {", ClientScript(), StringComparison.Ordinal);
+            Assert.Contains("                    " + language + ": {", page, StringComparison.Ordinal);
+        }
+
+        var options = Regex.Matches(page, "<select[^>]*id=\"jpLanguage\"[^>]*>(?<body>.*?)</select>", RegexOptions.Singleline)[0].Groups["body"].Value;
+        Assert.Equal(
+            Jellyfin.Plugin.JellyPortal.Summary.Languages.All.OrderBy(x => x, StringComparer.Ordinal),
+            Regex.Matches(options, "<option value=\"(\\w+)\"").Select(m => m.Groups[1].Value).OrderBy(x => x, StringComparer.Ordinal));
     }
 
     [Fact]

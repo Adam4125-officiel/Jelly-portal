@@ -30,6 +30,13 @@ public sealed class SummaryDto
     [JsonPropertyName("pollSeconds")]
     public int PollSeconds { get; init; } = 60;
 
+    /// <summary>
+    /// Gets the administrator's language setting: en, fr or auto. With auto the browser picks the language of the
+    /// viewer's own Jellyfin; the texts themselves are all written in the browser.
+    /// </summary>
+    [JsonPropertyName("language")]
+    public string Language { get; init; } = Languages.Default;
+
     /// <summary>Gets where this came from.</summary>
     [JsonPropertyName("portal")]
     public PortalInfoDto Portal { get; init; } = new();

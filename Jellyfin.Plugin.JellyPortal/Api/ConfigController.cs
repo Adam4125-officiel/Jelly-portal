@@ -44,7 +44,7 @@ public class ConfigController : ControllerBase
     /// <summary>Saves the settings.</summary>
     /// <param name="update">What the page submitted.</param>
     /// <response code="200">Saved; the answer is the settings as they are now (numbers may have been clamped).</response>
-    /// <response code="400">Refused, with the reason in French.</response>
+    /// <response code="400">Refused, with an error code the page words (invalid_portal_url, invalid_public_url, invalid_language).</response>
     /// <returns>The settings as JSON.</returns>
     [HttpPost]
     [Produces(MediaTypeNames.Application.Json)]
@@ -82,7 +82,7 @@ public class ConfigController : ControllerBase
         var applied = ConfigService.Apply(Current(), update);
         if (applied.Configuration is null)
         {
-            return Json(new ConnectionResult(false, "bad_response", applied.Error ?? string.Empty, 0));
+            return Json(new ConnectionResult(false, applied.Error ?? "bad_response", null, 0));
         }
 
         var result = await ConnectionTester.TestAsync(_client, applied.Configuration.ToSettings(), cancellationToken).ConfigureAwait(false);
