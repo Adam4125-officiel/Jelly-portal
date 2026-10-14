@@ -15,6 +15,7 @@ from common import BASE, PORTAL_KEY, SHOTS, Recorder, chrome, login, strip_ws  #
 from playwright.sync_api import sync_playwright  # noqa: E402
 
 FAKE = "http://172.17.0.1:8099"
+PUBLIC = "https://status.dev.example"
 PAGE = f"{BASE}/web/#/configurationpage?name=Jelly%20Portal"
 failures: list[str] = []
 
@@ -35,7 +36,7 @@ def reset_settings() -> None:
     import jf
     token = jf.login()
     status, body = jf.call("POST", "/JellyPortal/Config", {
-        "portalUrl": FAKE, "apiKey": PORTAL_KEY, "clearApiKey": False, "adminsOnly": False, "priorityServices": "",
+        "portalUrl": FAKE, "publicUrl": PUBLIC, "apiKey": PORTAL_KEY, "clearApiKey": False, "adminsOnly": False, "priorityServices": "",
         "soonWindowHours": 24, "pollSeconds": 60, "cacheSeconds": 30}, token)
     assert status == 200, (status, body)
 
@@ -110,6 +111,23 @@ with sync_playwright() as p:
     page.wait_for_selector("#jpPortalUrl")
     page.wait_for_function("() => document.querySelector('#jpPortalUrl').value.length > 0", timeout=15000)
     check(page.input_value("#jpPortalUrl") == "http://172.17.0.1:8099", "after the refusal the saved address is unchanged")
+
+    # The public address (the bubble's link) is its own setting: shown, refused when malformed, removable, saved.
+    check(page.input_value("#jpPublicUrl") == PUBLIC, "the saved public address is shown, apart from the address the portal is asked with")
+    page.fill("#jpPublicUrl", "ftp://status.example")
+    page.click("#jpForm button[type=submit]")
+    page.wait_for_function("() => document.querySelector('#jpSaveResult').textContent.includes('pas valide')", timeout=20000)
+    check("publique" in page.inner_text("#jpSaveResult") and "https://" in page.inner_text("#jpSaveResult"), "a malformed public address is refused with a sentence that names it and says what to type")
+    page.fill("#jpPublicUrl", "")
+    page.click("#jpForm button[type=submit]")
+    page.wait_for_function("() => document.querySelector('#jpSaveResult').textContent.includes('Enregistr')", timeout=20000)
+    page.reload(wait_until="domcontentloaded")
+    page.wait_for_function("() => document.querySelector('#jpPortalUrl').value.length > 0", timeout=15000)
+    check(page.input_value("#jpPublicUrl") == "", "a blank public address is saved as blank (no link)")
+    page.fill("#jpPublicUrl", PUBLIC)
+    page.click("#jpForm button[type=submit]")
+    page.wait_for_function("() => document.querySelector('#jpSaveResult').textContent.includes('Enregistr')", timeout=20000)
+    check(page.input_value("#jpPublicUrl") == PUBLIC and page.input_value("#jpPortalUrl") == "http://172.17.0.1:8099", "the public address is saved and the other address is untouched")
 
     # Clear the key, save, then the connection test reports the missing key; put it back through the page.
     page.click("#jpClearKey")

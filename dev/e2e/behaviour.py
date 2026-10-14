@@ -6,6 +6,7 @@ browser's own time zone, recovers from a portal outage by itself, and gives way 
 
 Needs the dev Jellyfin, the fake portal, and `dev/jf.py configure --cache 5 --poll 10`. Runs a few minutes.
 """
+import json
 import sys
 import time
 import urllib.request
@@ -231,6 +232,28 @@ with sync_playwright() as p:
         ctx.close()
     scenario("ok")
     time.sleep(6)
+
+    # ---------------------------------------------------------------- the bubble's link is the public address, never the one the portal is asked with
+    scenario("ok")
+    for public, label in (("https://status.dev.example", "a public address is set"), ("", "no public address")):
+        config(publicUrl=public)
+        ctx, page, rec, reqs = new_page(browser)
+        login(page)
+        wait_icon(page, "ok")
+        page.click(ICON)
+        page.wait_for_selector(".jellyportal-bubble")
+        link = page.locator(".jellyportal-link")
+        if public:
+            check(link.count() == 1 and link.get_attribute("href") == public + "/", f"[{label}] the bubble's link is that address")
+        else:
+            check(link.count() == 0, f"[{label}] the bubble has no link at all")
+        summaries = [body for url, body in rec.bodies if "/JellyPortal/Summary" in url]
+        check(bool(summaries) and all("172.17.0.1" not in body and ":8099" not in body for body in summaries),
+              f"[{label}] the address the portal is asked with is in no summary the browser received")
+        check(bool(summaries) and all(json.loads(body)["portal"]["url"] == (public or None) for body in summaries),
+              f"[{label}] the summary carries exactly the public address ({public or 'null'})")
+        ctx.close()
+    config(publicUrl="https://status.dev.example")
 
     # ---------------------------------------------------------------- giving way to Jellyfin's own header menus
     scenario("busy")

@@ -8,7 +8,7 @@
     jf.py install NAME [VERSION]     install from the catalog, like the dashboard does
     jf.py plugins                    list installed plugins and their status
     jf.py get PATH                   GET an API path and print the JSON
-    jf.py configure [--url U] [--key K] [--admins-only] [--priority NAMES] [--window-hours N]
+    jf.py configure [--url U] [--public-url U] [--key K] [--admins-only] [--priority NAMES] [--window-hours N]
                                      write the Jelly Portal configuration file (restart Jellyfin after)
     jf.py create-user NAME           create a non-administrator user (password in dev/data/dev-<name>.json)
     jf.py summary [--as NAME]        GET /JellyPortal/Summary as the dev admin or as that user
@@ -71,13 +71,14 @@ def login(state: Path | None = None) -> str:
 PLUGIN_CONFIG = Path(__file__).resolve().parent / "data" / "config" / "plugins" / "configurations" / "Jellyfin.Plugin.JellyPortal.xml"
 DEFAULT_PORTAL_URL = "http://172.17.0.1:8099"
 DEFAULT_PORTAL_KEY = "dev-key-0123456789abcdef0123456789abcdef0123456789ab"
+DEFAULT_PUBLIC_URL = "https://status.dev.example"
 
 
 def configure(args: list[str]) -> None:
     """Writes the plugin's XML configuration the way Jellyfin stores it. The key is [JsonIgnore]d, so the
     standard configuration API cannot set it; the file is the dev way (Jellyfin reads it at start)."""
     from xml.sax.saxutils import escape
-    opts = {"url": DEFAULT_PORTAL_URL, "key": DEFAULT_PORTAL_KEY, "priority": "", "window-hours": "24",
+    opts = {"url": DEFAULT_PORTAL_URL, "public-url": DEFAULT_PUBLIC_URL, "key": DEFAULT_PORTAL_KEY, "priority": "", "window-hours": "24",
             "poll": "60", "cache": "30", "admins-only": "false"}
     it = iter(args)
     for a in it:
@@ -91,12 +92,12 @@ def configure(args: list[str]) -> None:
     PLUGIN_CONFIG.write_text(
         '<?xml version="1.0" encoding="utf-8"?>\n'
         '<PluginConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">\n'
-        f'  <PortalUrl>{escape(opts["url"])}</PortalUrl>\n  <ApiKey>{escape(opts["key"])}</ApiKey>\n'
+        f'  <PortalUrl>{escape(opts["url"])}</PortalUrl>\n  <PublicUrl>{escape(opts["public-url"])}</PublicUrl>\n  <ApiKey>{escape(opts["key"])}</ApiKey>\n'
         f'  <PollSeconds>{opts["poll"]}</PollSeconds>\n  <CacheSeconds>{opts["cache"]}</CacheSeconds>\n'
         f'  <SoonWindowHours>{opts["window-hours"]}</SoonWindowHours>\n'
         f'  <PriorityServices>{escape(opts["priority"]).replace(chr(44), chr(10))}</PriorityServices>\n'
         f'  <AdminsOnly>{opts["admins-only"]}</AdminsOnly>\n</PluginConfiguration>\n', encoding="utf-8")
-    print(f"wrote {PLUGIN_CONFIG.name} (url={opts['url']}, admins-only={opts['admins-only']}, priority={opts['priority']!r})")
+    print(f"wrote {PLUGIN_CONFIG.name} (url={opts['url']}, public-url={opts['public-url']!r}, admins-only={opts['admins-only']}, priority={opts['priority']!r})")
 
 
 def create_user(name: str) -> None:
