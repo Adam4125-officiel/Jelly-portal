@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "0.1.0.1",
+        "changelog": "### Features\n- client: the status icon and its bubble in the Jellyfin header (bb6f665)\n- config: a settings page in the dashboard, in French (2859818)\n- summary: pass the configured polling interval on to the browser (1cfec46)\n- injection: add the plugin's script and stylesheet to index.html through File Transformation (e8fae0e)\n- dev: a strict fake portal and the dev loop (3335add)\n- api: cache the portal reading and serve GET /JellyPortal/Summary (74abf5b)\n- portal: read the portal's display-device API and hold the settings (7a50615)\n- summary: read the portal's display-device answer (d369815)\n- summary: compute the icon state and the panel content from a portal reading (534d867)\n\n### Other changes\n- README pictures, the client's design, and a handoff note for the next session (8be6e46)\n- describe the settings page and its rules, and the end-to-end checks (51d06d0)\n- record how the File Transformation registration really works (9fcaa68)\n- describe the dev loop, the fake portal and what was verified live (4762c85)\n- write the French examples with their accents (aac533d)\n- record the data source, the state rules and the phase-2 order of work (1e12b6d)\n\n**Full changelog**: https://github.com/Adam4125-officiel/Jelly-portal/compare/v0.0.1-rc.1...v0.1.0-rc.1",
+        "targetAbi": "12.2.0.0",
+        "sourceUrl": "https://github.com/Adam4125-officiel/Jelly-portal/releases/download/v0.1.0-rc.1/jelly-portal_0.1.0.1.zip",
+        "checksum": "772DCCAEFF8B6870396D228DFC16643B",
+        "timestamp": "2026-10-14T10:51:38Z"
+      },
+      {
         "version": "0.0.1.1",
         "changelog": "### Features\n- release: map a stable tag to X.Y.Z.100 so it outranks its release candidates (2047fe7)\n- add the empty plugin skeleton and its test project (cdf5f10)\n\n### Other changes\n- record the PR-only workflow and what the main/tag rulesets enforce (e98879c)\n- make \"maintenance in progress\" violet and reserve orange for degraded (2a5a157)\n- explain the new version mapping and drop the stable-below-RC note (adbdcc2)\n- add CLAUDE.md and complete the README (3b54784)\n- Initial commit (76eaa52)",
         "targetAbi": "12.2.0.0",
