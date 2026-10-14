@@ -2,7 +2,7 @@
 
 Context that has to survive between sessions. The original brief (a long French prompt) is **not**
 available to later sessions; everything binding in it is here. Repository content is written in
-**English**; the owner chats in **French**; the plugin's user interface is in **French**.
+**English**; the owner chats in **French**; the plugin's user interface is in **English by default, with French available** (the `language` setting, see *Language* below).
 
 ## Read this part even if you read nothing else
 
@@ -93,7 +93,7 @@ For the header, read the **real DOM in `refs/jellyfin-web`**, for the **Modern**
 ## Client behaviour (specified by the owner)
 
 JavaScript only: vanilla, no framework, no CDN, every log prefixed `[JellyPortal]`, **zero console
-errors in normal cases**. UI text is French.
+errors in normal cases**. UI text is English or French (the `language` setting, see *Language* below).
 
 **Icon**: inserted in the header next to the existing icons. jellyfin-web is an SPA that re-renders
 the header, so use a `MutationObserver`; never create a duplicate; it must survive navigation, in
@@ -130,10 +130,10 @@ falls inside the window. The internal state names are `down`, `maintenance_ongoi
 - Content, in this order: services with a state dot (worst first, as the portal sends them); **open
   incidents ("Incidents en cours") right after the services that are down** (title, status
   investigating / identified / monitoring, since when, services concerned); maintenance in progress
-  (time remaining); upcoming maintenance (readable countdown such as "dans 3 h"), priority ones first
-  and highlighted; active announcements; an "Ouvrir le status portal" link.
-- **Times are shown in the browser's local time zone, in French**: "aujourd'hui à 22:00",
-  "demain à 03:00", "dans 3 h", "se termine dans 45 min". The JSON stays UTC with a `Z`; the
+  (time remaining); upcoming maintenance (readable countdown such as "in 3 h"), priority ones first
+  and highlighted; active announcements; an "Open the status portal" link (only when a public address is set).
+- **Times are shown in the browser's local time zone, in the bubble's language**: "today at 22:00",
+  "tomorrow at 03:00", "in 3 h", "ends in 45 min" (or "aujourd’hui à 22:00", "demain à 03:00", "dans 3 h", "se termine dans 45 min"). The JSON stays UTC with a `Z`; the
   conversion is client-side, after correcting the browser's clock skew with `SummaryDto.now`. A test
   covers it across both daylight-saving changes (the formatter takes the time zone as a parameter so it
   can be tested in any zone).
@@ -146,7 +146,7 @@ and refreshes immediately when the tab returns.
 
 One script and one stylesheet, embedded in the plugin: `Web/jellyportal.js` (IIFE, no framework, no external
 load: a test forbids `@import`, `url(` and any other host) and `Web/jellyportal.css`. Its pure helpers
-(durations, local times, clock skew, bubble placement, French wording) are exported when it is loaded as a
+(durations, local times, clock skew, bubble placement, the wording in both languages) are exported when it is loaded as a
 CommonJS module, and tested with Node's own runner: `node --test client-tests/*.test.js` (CI runs it in the
 `Client JS syntax` job). The DOM part is covered by the end-to-end scripts in `dev/e2e/` (`bubble.py`, `behaviour.py`, `config_page.py`,
 and `player.py`, which plays a real clip: it makes a short VP9 file and a throw-away "Test" library in the dev Jellyfin itself).
@@ -201,6 +201,35 @@ and `player.py`, which plays a real clip: it makes a short VP9 file and a throw-
 - **Dev builds are not cached by the browser between rebuilds** (`no-cache` + ETag), but the `?v=` is the plugin
   version, so every dev build is `0.0.0.1`: hard-reload if a stale script is suspected.
 
+## Language (English by default, French available) - owner's request, 2026-10-14
+
+The owner first specified a French interface, then said (2026-10-14) that he had wanted English "if feasible", and asked for a
+real internationalisation with a **Language** setting: English, Français or Auto, **English by default**. The repository itself
+was already English; only the interface texts and the tests that assert them were French.
+
+- **`language` is `en`, `fr` or `auto`** (`Summary/Languages.cs` is the one list; anything else is refused by the settings
+  endpoint as `invalid_language` and reads as `en` if it is ever found stored). It reaches the browser as `SummaryDto.language`
+  (the *setting*, not a resolved language). **`auto` is resolved in the browser, for each viewer**, from `<html lang>`, which
+  jellyfin-web writes from the viewer's own display language; the server cannot know it. Anything that is not French is English.
+- **All the texts of the bubble live in the browser**, in two flat tables, `TEXT_EN` and `TEXT_FR`, with `\w+` keys
+  (`state_down`, `reason_timeout`, `h_incidents`...) and `{0}` placeholders, read through `text(lang, key, args)`. The tables must
+  have the same keys, the same placeholders, and a sentence for **every state and every failure reason the server can send**: the
+  convention tests (`TheClientKnowsEveryState...`, `...HasASentenceForEveryReason...`, `EveryLanguageOfTheClientHasTheSame...`)
+  and the Node tests enforce it, so a new reason nobody worded fails the build instead of showing as a blank. **The server never
+  sends a sentence meant for a person**: it sends codes and numbers (`reason`, `siteName`, `services`, an error code).
+- **Dates and times use a fixed locale per language** (`localeOf`: `fr-FR`, `en-GB`), both with a 24-hour clock, rather than the
+  browser's own, so a screenshot, a test and the owner's screen agree. The helpers take the language as their last argument.
+- **The settings page** (`configPage.html`) has the same shape: one table `T = { en: {...}, fr: {...} }` between `/*T-begin*/`
+  and `/*T-end*/`, `data-t="key"` on the markup, and every message kept as a key so that choosing another language rewrites the
+  page *and* a message already on screen at once (a preview: only Save keeps it). A failure reason and a refused setting share
+  one namespace, `reason_<code>`; a C# test checks that every `SummaryFailure` and every `invalid_*` code has its sentence twice.
+- **To add a language**: a `TEXT_XX` table in the client, an entry in the page's `T`, `Languages.All`, an `<option>` in the page's
+  selector, and `localeOf`; `TheLanguagesTheServerAcceptsAreTheOnesTheClientAndThePageHave` lists exactly what is missing.
+- **The e2e scripts take `JP_LANG=en|fr`** (English by default), set it through the plugin's own settings endpoint, check the
+  wording of that language and write screenshots under `./screenshots/<language>/`. `behaviour.py` also checks `auto` with
+  browsers in `fr-FR`, `en-US` and `de-DE`, and an explicit language against a browser in the other one.
+- **Not verified**: the wording in English was written by the model, not reviewed by a native reader; the French is the original.
+
 ## Server behaviour (specified by the owner, refined 2026-10-13)
 
 1. **Admin config page** (dashboard): status portal URL; **the portal's display-device API key
@@ -216,7 +245,7 @@ and `player.py`, which plays a real clip: it makes a short VP9 file and a throw-
    the summary carried the API address to every signed-in user (rc.1 did), which is why `SummaryCalculator` only takes
    the public one and why `SummaryServiceTests` asserts that the private address is in no JSON in any state. Both go
    through the same validation (`PortalClient.TryBuildUri`: http(s), a host, no credentials, no parameters).
-   **The settings page (`Configuration/configPage.html`, in French, reachable from the dashboard sidebar and
+   **The settings page (`Configuration/configPage.html`, in both languages, reachable from the dashboard sidebar and
    from Plugins) talks only to this plugin's own endpoints**, all admin-only (`RequiresElevation`):
    `GET/POST /JellyPortal/Config` and `POST /JellyPortal/Config/Test`. It must never use Jellyfin's generic
    `getPluginConfiguration`/`updatePluginConfiguration`: that API would hand the portal key to the browser, and
