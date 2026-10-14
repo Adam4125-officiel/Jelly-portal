@@ -326,4 +326,14 @@ public class SummaryCalculatorTests
             ["down", "maintenance_ongoing", "degraded", "maintenance_soon", "ok", "unknown"],
             Enum.GetValues<SummaryState>().Select(s => s.Name()));
     }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void ABlankPublicAddressIsNoLinkAtAll(string publicUrl)
+    {
+        var ok = SummaryCalculator.Calculate(Snapshot(), Now, new SummaryOptions(), publicUrl, Now);
+        Assert.Null(ok.Portal.Url);
+        Assert.Null(SummaryCalculator.Unavailable(SummaryFailure.Timeout, publicUrl, Now).Portal.Url);
+    }
 }

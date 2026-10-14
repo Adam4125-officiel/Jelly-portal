@@ -32,13 +32,13 @@ public class SummaryServiceTests
     }
 
     [Fact]
-    public async Task AFailedReadingIsUnknownWithItsReasonAndTheAddressForTheLink()
+    public async Task AFailedReadingIsUnknownWithItsReasonAndThePublicAddressForTheLink()
     {
         var client = new CountingClient(_ => Task.FromResult(Failure(SummaryFailure.BadApiKey, _clock.GetUtcNow())));
         var dto = await Service(client).GetAsync(CancellationToken.None);
         Assert.Equal("unknown", dto.State);
         Assert.Equal("bad_api_key", dto.Reason);
-        Assert.Equal(Url, dto.Portal.Url);
+        Assert.Equal(PublicUrl, dto.Portal.Url);
     }
 
     [Fact]
@@ -48,7 +48,7 @@ public class SummaryServiceTests
         var dto = await Service(Returning(snapshot)).GetAsync(CancellationToken.None);
         Assert.Equal("degraded", dto.State);
         Assert.Null(dto.Reason);
-        Assert.Equal(Url, dto.Portal.Url);
+        Assert.Equal(PublicUrl, dto.Portal.Url);
     }
 
     [Fact]
@@ -100,14 +100,49 @@ public class SummaryServiceTests
     }
 
     [Fact]
+    public async Task WithoutAPublicAddressThereIsNoLink()
+    {
+        _settings.Current = Configured(publicUrl: "");
+        var good = await Service(Returning(Builders.Snapshot())).GetAsync(CancellationToken.None);
+        Assert.Null(good.Portal.Url);
+        var failing = new CountingClient(_ => Task.FromResult(Failure(SummaryFailure.Timeout, _clock.GetUtcNow())));
+        Assert.Null((await Service(failing).GetAsync(CancellationToken.None)).Portal.Url);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("https://status.example.com")]
+    public async Task TheAddressThePortalIsAskedWithNeverReachesABrowserInAnyState(string publicUrl)
+    {
+        // The address the plugin uses is often a private one (a machine on the local network). Every signed-in user
+        // gets the summary, so it must not be in it, whatever the outcome of the reading.
+        const string Private = "http://192.168.0.55:5000";
+        _settings.Current = Configured(url: Private, publicUrl: publicUrl);
+        var failing = new CountingClient(_ => Task.FromResult(Failure(SummaryFailure.Timeout, _clock.GetUtcNow())));
+        var summaries = new[]
+        {
+            await Service(Returning(Builders.Snapshot([Builders.Svc("Jellyfin", ServiceStatus.Down)]))).GetAsync(CancellationToken.None),
+            await Service(failing).GetAsync(CancellationToken.None),
+        };
+        _settings.Current = Configured(url: Private, publicUrl: publicUrl, key: "");
+        var unconfigured = await Service(Returning(Builders.Snapshot())).GetAsync(CancellationToken.None);
+        foreach (var dto in summaries.Append(unconfigured))
+        {
+            var json = System.Text.Json.JsonSerializer.Serialize(dto);
+            Assert.DoesNotContain("192.168.0.55", json, StringComparison.Ordinal);
+            Assert.DoesNotContain(":5000", json, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
     public async Task ThePollingIntervalIsPassedOnToTheBrowserWhateverTheState()
     {
-        _settings.Current = JellyPortalSettings.From(Url, "k", 45, 30, 24, "", false);
+        _settings.Current = JellyPortalSettings.From(Url, PublicUrl, "k", 45, 30, 24, "", false);
         var good = await Service(Returning(Builders.Snapshot())).GetAsync(CancellationToken.None);
         Assert.Equal(45, good.PollSeconds);
         var failing = new CountingClient(_ => Task.FromResult(Failure(SummaryFailure.Timeout, _clock.GetUtcNow())));
         Assert.Equal(45, (await Service(failing).GetAsync(CancellationToken.None)).PollSeconds);
-        _settings.Current = JellyPortalSettings.From("", "", 45, 30, 24, "", false);
+        _settings.Current = JellyPortalSettings.From("", "", "", 45, 30, 24, "", false);
         Assert.Equal(45, (await Service(Returning(Builders.Snapshot())).GetAsync(CancellationToken.None)).PollSeconds);
     }
 }

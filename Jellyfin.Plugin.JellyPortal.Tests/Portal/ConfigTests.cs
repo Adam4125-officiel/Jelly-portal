@@ -13,6 +13,7 @@ public class ConfigServiceTests
     private static PluginConfiguration Saved() => new()
     {
         PortalUrl = "http://portal.example:5000",
+        PublicUrl = "https://status.example.com",
         ApiKey = "super-secret-key",
         PollSeconds = 45,
         CacheSeconds = 20,
@@ -117,6 +118,38 @@ public class ConfigServiceTests
         Assert.Null(result.Configuration);
         Assert.Contains("http://", result.Error, StringComparison.Ordinal);
         Assert.Contains("adresse", result.Error, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void ThePublicAddressIsShownApartFromTheOneThePortalIsAskedWith()
+    {
+        var view = ConfigService.View(Saved(), RegistrationResult.Registered);
+        Assert.Equal("https://status.example.com", view.PublicUrl);
+        Assert.Equal("http://portal.example:5000", view.PortalUrl);
+    }
+
+    [Fact]
+    public void ThePublicAddressIsKeptWhenNotSubmittedAndRemovedWhenBlank()
+    {
+        Assert.Equal("https://status.example.com", ConfigService.Apply(Saved(), new ConfigUpdate()).Configuration!.PublicUrl);
+        Assert.Equal(string.Empty, ConfigService.Apply(Saved(), new ConfigUpdate { PublicUrl = "  " }).Configuration!.PublicUrl);
+        var changed = ConfigService.Apply(Saved(), new ConfigUpdate { PublicUrl = " https://other.example/status " }).Configuration!;
+        Assert.Equal("https://other.example/status", changed.PublicUrl);
+        Assert.Equal("http://portal.example:5000", changed.PortalUrl);
+    }
+
+    [Theory]
+    [InlineData("status.example.com")]
+    [InlineData("ftp://status.example.com")]
+    [InlineData("javascript:alert(1)")]
+    [InlineData("https://user:pass@status.example.com")]
+    [InlineData("https://status.example.com/?x=1")]
+    public void APublicAddressThatCannotBeUsedIsRefusedAndNothingIsApplied(string url)
+    {
+        var result = ConfigService.Apply(Saved(), new ConfigUpdate { PublicUrl = url, PollSeconds = 99 });
+        Assert.Null(result.Configuration);
+        Assert.Contains("publique", result.Error, StringComparison.Ordinal);
+        Assert.Contains("https://", result.Error, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -277,7 +310,7 @@ public class SettingsPageTests
     public void ThePageHasEveryFieldTheScriptReads()
     {
         var page = Page();
-        foreach (var id in new[] { "jpPortalUrl", "jpApiKey", "jpClearKey", "jpTest", "jpTestResult", "jpAdminsOnly", "jpPriority", "jpSoon", "jpPoll", "jpCache", "jpSaveResult", "jpFileTransformation", "jpForm" })
+        foreach (var id in new[] { "jpPortalUrl", "jpPublicUrl", "jpApiKey", "jpClearKey", "jpTest", "jpTestResult", "jpAdminsOnly", "jpPriority", "jpSoon", "jpPoll", "jpCache", "jpSaveResult", "jpFileTransformation", "jpForm" })
         {
             Assert.Contains($"id=\"{id}\"", page, StringComparison.Ordinal);
         }

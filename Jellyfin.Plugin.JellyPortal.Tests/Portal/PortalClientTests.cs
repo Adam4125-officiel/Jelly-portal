@@ -85,7 +85,7 @@ public class PortalClientTests
     {
         var handler = new StubHandler(HttpStatusCode.OK, DevicePayloadParserTests.Valid);
         using var client = Client(handler, Clock);
-        var reading = await client.ReadAsync(JellyPortalSettings.From(url, key, 60, 30, 24, "", false), CancellationToken.None);
+        var reading = await client.ReadAsync(JellyPortalSettings.From(url, "", key, 60, 30, 24, "", false), CancellationToken.None);
         Assert.Equal(SummaryFailure.NotConfigured, reading.Outcome.Failure);
         Assert.Empty(handler.Requests);
     }
