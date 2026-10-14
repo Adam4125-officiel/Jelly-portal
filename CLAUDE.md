@@ -13,8 +13,10 @@ available to later sessions; everything binding in it is here. Repository conten
 2. **The plugin GUID never changes:** `a72a6bca-0bfe-480c-946f-e0a3fcb2c746`. Jellyfin identifies a
    plugin by it; change it and every version becomes a different plugin. It lives in
    `PluginIdentity.Id`, `build.yaml` and this file, and a test keeps all three equal.
-3. **You may create and push `-rc.N` tags. You never create a stable `vX.Y.Z` tag.** The owner
-   promotes. A published tag is never deleted or moved: if an RC is broken, the fix is the next RC.
+3. **You may create and push `-rc.N` tags. You never create a stable `vX.Y.Z` tag on your own initiative.** The owner
+   promotes; the one time Claude cut a stable tag (`v0.1.0`, 2026-10-14) it was because the owner said so explicitly, after
+   testing the RC on his production, and that was not a standing permission. A published tag is never deleted or moved: if
+   an RC is broken, the fix is the next RC.
    GitHub now enforces this (see *Git workflow and branch protection*), so a burnt RC number stays burnt.
 4. **Everything goes through a branch (`feat/...`, `fix/...`) and a pull request.** `main` is
    protected, with no bypass for anyone, admins included. You may merge your own PRs once CI is green.
@@ -412,22 +414,26 @@ Read the rest of this file first; this section is only the state of play. The ow
 
 **Released:** `v0.0.1-rc.1` (empty plugin, the release test), `v0.1.0-rc.1` (the client itself) and **`v0.1.0-rc.2` (Jellyfin
 `0.1.0.2`)**, which adds the icon in the playback header, the separate public address for the bubble's link, and English/French
-with a Language setting (English by default). All PRs (#1-#9) are merged; `main` is the rc.2 commit plus docs. The owner installs
-through the unstable repository on his own Jellyfin, which updates the plugin by itself. **There is no stable `v0.1.0` yet and
-Claude never creates one**: when the owner has validated an RC he tags `v0.1.0` on that RC's commit.
+with a Language setting (English by default), and then **`v0.1.0` (Jellyfin `0.1.0.100`), the first stable release**: the owner
+tested rc.2 on his own production, reported it stable and told Claude to release it (2026-10-14). It was tagged on the rc.2
+commit `837d77d`, **not on `main`'s head** (two docs/test commits came after; the release tooling refuses a stable tag on a
+commit that carries no RC tag). The stable build is code-identical to rc.2 and went through the same checks again (installed from
+a catalog with only the stable repository: it offers `0.1.0.100` alone; 338 bubble checks and the playback check in Modern and
+Legacy passed). All PRs (#1-#11) are merged. The owner can stay on the unstable repository, which offers stables too.
 
 **The portal side is done:** Status Portal **`v1.12.0` is stable** (the owner asked for it on 2026-10-14; PR #29 merged, tag and
 release cut from that repository). The plugin needs >= 1.12.0 (`detail=full`).
 
 **Next, in order:**
-1. **The owner tests rc.2 on his production and reports.** What to say to him when he reports a bug: ask for the `[JellyPortal]`
-   lines of the Jellyfin log and the exact text of "Test the connection". A fix is the next RC (`rc.3`), never a moved tag.
-2. After an upgrade from rc.1 the interface is English until the Language setting is changed, and the bubble has **no link** until
+1. **Nothing is pending.** The owner uses the Modern layout (his screenshot: library tabs in the app bar, round avatar). When he
+   reports a bug, ask for the `[JellyPortal]` lines of the Jellyfin log and the exact text of "Test the connection". A fix is a
+   new RC of the next version (`v0.1.1-rc.1`, ...), never a moved tag, and promoting it to stable needs his explicit word again.
+2. Coming from rc.1, the interface is English until the Language setting is changed, and the bubble has **no link** until
    a public address is entered (rc.1 linked to the address the plugin asks the portal with, and sent it to every signed-in user,
    which is why that address no longer reaches a browser at all). Say so if he is surprised.
 3. Anything new is proposed to the owner first.
 
-**Verified on the rc.2 artifact itself (installed from the unstable catalog on the Dockerised Jellyfin 12.2, not a local build):**
+**Verified on the rc.2 artifact itself (installed from the unstable catalog on the Dockerised Jellyfin 12.2, not a local build; the stable `v0.1.0` is the same code):**
 `bubble.py` 1644 checks, 0 failures **in English and again in French** (16 scenarios x Modern/Legacy x desktop/phone), `behaviour.py`
 72/0, `player.py` 128/0, and against **his real portal 1.12.0** the settings page's "Test the connection", the summary and the
 bubble in both languages and the four layouts (his portal was healthy at the time, so only the OK state and one `slow` service were

@@ -7,9 +7,10 @@ header icons. The icon reflects the overall state of your self-hosted services a
 bubble over the current page with the details: services, maintenance in progress or coming up, and
 active announcements.
 
-> **Status: pre-release.** Everything described below works and has been checked in a real browser against a Jellyfin
-> 12.2 and a stand-in portal that has the shape of the real one; what has not been seen yet is the real portal 1.12.0
-> in production. Install it from the **unstable** repository.
+> **Status: stable release 0.1.0.** Everything described below works and has been checked in a real browser against a
+> Jellyfin 12.2 and a stand-in portal that has the shape of the real one, and it has run against a real Status Portal
+> 1.12.0 and on the owner's own Jellyfin. Not tried: Jellyfin Desktop, the Android app, a touch device, the TV layout.
+> Install it from the **stable** repository below.
 
 ## Requirements
 
