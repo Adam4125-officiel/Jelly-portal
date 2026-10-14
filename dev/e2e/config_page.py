@@ -168,7 +168,8 @@ with sync_playwright() as p:
     import jf
     token = jf.login()
     status, body = jf.call("POST", "/JellyPortal/Config", {"language": "klingon"}, token)
-    check(status == 400 and body.get("error") == "invalid_language", f"the server refuses a language that does not exist (HTTP {status}, {body})")
+    refusal = json.loads(body) if isinstance(body, str) else body    # an error answer comes back as text
+    check(status == 400 and refusal.get("error") == "invalid_language", f"the server refuses a language that does not exist (HTTP {status}, {body})")
     _, view = jf.call("GET", "/JellyPortal/Config", token=token)
     check(view["language"] == OTHER, "and the refusal changed nothing")
     page.select_option("#jpLanguage", "auto")
