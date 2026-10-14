@@ -14,7 +14,7 @@ public static class SummaryCalculator
     /// <param name="snapshot">What the portal said.</param>
     /// <param name="asOf">The portal's clock now (see <see cref="PortalTime.EstimatePortalNow"/>).</param>
     /// <param name="options">The settings.</param>
-    /// <param name="portalUrl">The portal's address, for the link.</param>
+    /// <param name="publicUrl">The public address of the portal, for the link. Blank means no link.</param>
     /// <param name="fetchedAt">When the portal was read, on this machine's clock.</param>
     /// <param name="pollSeconds">The configured polling interval, passed on to the browser.</param>
     /// <returns>The summary.</returns>
@@ -22,7 +22,7 @@ public static class SummaryCalculator
         PortalSnapshot snapshot,
         DateTimeOffset asOf,
         SummaryOptions options,
-        string portalUrl,
+        string publicUrl,
         DateTimeOffset fetchedAt,
         int pollSeconds = 60)
     {
@@ -92,7 +92,7 @@ public static class SummaryCalculator
             State = state.Name(),
             Now = PortalTime.Format(asOf),
             PollSeconds = pollSeconds,
-            Portal = new PortalInfoDto { Name = snapshot.SiteName, Url = portalUrl, FetchedAt = PortalTime.Format(fetchedAt) },
+            Portal = new PortalInfoDto { Name = snapshot.SiteName, Url = LinkOrNull(publicUrl), FetchedAt = PortalTime.Format(fetchedAt) },
             Services = snapshot.Services
                 .Select(s => new ServiceDto { Name = s.Name, Status = StatusName(s.Status), Priority = priority.Contains(s.Name) })
                 .ToList(),
@@ -117,18 +117,20 @@ public static class SummaryCalculator
 
     /// <summary>The summary when the portal could not be read: no data, a state of unknown and a code that says why.</summary>
     /// <param name="reason">Why.</param>
-    /// <param name="portalUrl">The configured address, if any, so the panel can still link to it.</param>
+    /// <param name="publicUrl">The public address, if any, so the panel can still link to it.</param>
     /// <param name="utcNow">This machine's clock.</param>
     /// <param name="pollSeconds">The configured polling interval, passed on to the browser.</param>
     /// <returns>The summary.</returns>
-    public static SummaryDto Unavailable(SummaryFailure reason, string portalUrl, DateTimeOffset utcNow, int pollSeconds = 60) => new()
+    public static SummaryDto Unavailable(SummaryFailure reason, string publicUrl, DateTimeOffset utcNow, int pollSeconds = 60) => new()
     {
         State = SummaryState.Unknown.Name(),
         Reason = reason.Name(),
         Now = PortalTime.Format(utcNow),
         PollSeconds = pollSeconds,
-        Portal = new PortalInfoDto { Url = portalUrl },
+        Portal = new PortalInfoDto { Url = LinkOrNull(publicUrl) },
     };
+
+    private static string? LinkOrNull(string publicUrl) => string.IsNullOrWhiteSpace(publicUrl) ? null : publicUrl.Trim();
 
     private static string StatusName(ServiceStatus status) => status switch
     {

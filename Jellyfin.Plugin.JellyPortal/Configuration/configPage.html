@@ -24,6 +24,11 @@
                         <div class="fieldDescription">L'adresse que le serveur Jellyfin utilise pour joindre le portal (pas forcément celle de votre navigateur). Sans identifiant ni paramètres.</div>
                     </div>
                     <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="jpPublicUrl">Adresse publique du portal (lien de la bulle)</label>
+                        <input id="jpPublicUrl" name="publicUrl" type="text" is="emby-input" placeholder="https://status.example.com" />
+                        <div class="fieldDescription">Facultatif. L'adresse que vos utilisateurs ouvrent avec le lien « Ouvrir le status portal » de la bulle, par exemple celle que vous leur donnez d'habitude. Laissée vide, la bulle n'a pas de lien. Ce n'est pas l'adresse ci-dessus : celle-là reste sur le serveur et n'est jamais envoyée à un navigateur.</div>
+                    </div>
+                    <div class="inputContainer">
                         <label class="inputLabel inputLabelUnfocused" for="jpApiKey">Clé de l'API « Display device » du portal</label>
                         <input id="jpApiKey" name="apiKey" type="password" is="emby-input" autocomplete="new-password" />
                         <div class="fieldDescription" id="jpApiKeyHint">Dans l'administration du portal : page Display device. La clé reste sur le serveur et n'est jamais envoyée à un navigateur.</div>
@@ -111,6 +116,7 @@
 
                 function fill(config) {
                     $('jpPortalUrl').value = config.portalUrl || '';
+                    $('jpPublicUrl').value = config.publicUrl || '';
                     $('jpApiKey').value = '';
                     $('jpApiKey').placeholder = config.hasApiKey ? '•••••••• (clé enregistrée, laissez vide pour la conserver)' : '';
                     $('jpClearKey').classList.toggle('hide', !config.hasApiKey);
@@ -139,6 +145,7 @@
                     };
                     return {
                         portalUrl: $('jpPortalUrl').value.trim(),
+                        publicUrl: $('jpPublicUrl').value.trim(),
                         apiKey: $('jpApiKey').value.trim() || null,
                         clearApiKey: clearKey,
                         adminsOnly: $('jpAdminsOnly').value === 'true',

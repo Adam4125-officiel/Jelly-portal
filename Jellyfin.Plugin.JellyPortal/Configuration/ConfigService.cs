@@ -17,9 +17,13 @@ public sealed record SettingRange(
 /// <summary>What the settings page is shown. The API key is never in it: only whether one is saved.</summary>
 public sealed class ConfigView
 {
-    /// <summary>Gets the portal address.</summary>
+    /// <summary>Gets the address the portal is asked with.</summary>
     [JsonPropertyName("portalUrl")]
     public string PortalUrl { get; init; } = string.Empty;
+
+    /// <summary>Gets the address of the panel's link.</summary>
+    [JsonPropertyName("publicUrl")]
+    public string PublicUrl { get; init; } = string.Empty;
 
     /// <summary>Gets a value indicating whether an API key is saved.</summary>
     [JsonPropertyName("hasApiKey")]
@@ -57,9 +61,13 @@ public sealed class ConfigView
 /// <summary>What the settings page submits. A null means "leave it as it is".</summary>
 public sealed class ConfigUpdate
 {
-    /// <summary>Gets or sets the portal address.</summary>
+    /// <summary>Gets or sets the address the portal is asked with.</summary>
     [JsonPropertyName("portalUrl")]
     public string? PortalUrl { get; set; }
+
+    /// <summary>Gets or sets the address of the panel's link. Null leaves it as it is; blank removes the link.</summary>
+    [JsonPropertyName("publicUrl")]
+    public string? PublicUrl { get; set; }
 
     /// <summary>Gets or sets a new API key. Null or blank keeps the saved one, because the page never has it to show.</summary>
     [JsonPropertyName("apiKey")]
@@ -108,6 +116,7 @@ public static class ConfigService
         return new ConfigView
         {
             PortalUrl = settings.PortalUrl,
+            PublicUrl = settings.PublicUrl,
             HasApiKey = settings.ApiKey.Length > 0,
             PollSeconds = settings.PollSeconds,
             CacheSeconds = settings.CacheSeconds,
@@ -145,12 +154,21 @@ public static class ConfigService
                 "L'adresse du portal n'est pas valide. Elle doit commencer par http:// ou https://, sans identifiant, sans paramètres (par exemple http://192.168.1.10:5000).");
         }
 
+        var publicUrl = (update.PublicUrl ?? current.PublicUrl).Trim();
+        if (publicUrl.Length > 0 && !PortalClient.TryBuildUri(publicUrl, out _))
+        {
+            return new ConfigApplyResult(
+                null,
+                "L'adresse publique n'est pas valide. Elle doit commencer par http:// ou https://, sans identifiant, sans paramètres (par exemple https://status.example.com).");
+        }
+
         var key = update.ClearApiKey ? string.Empty
             : string.IsNullOrWhiteSpace(update.ApiKey) ? current.ApiKey
             : update.ApiKey.Trim();
 
         var clamped = JellyPortalSettings.From(
             url,
+            publicUrl,
             key,
             update.PollSeconds ?? current.PollSeconds,
             update.CacheSeconds ?? current.CacheSeconds,
@@ -162,6 +180,7 @@ public static class ConfigService
             new PluginConfiguration
             {
                 PortalUrl = clamped.PortalUrl,
+                PublicUrl = clamped.PublicUrl,
                 ApiKey = clamped.ApiKey,
                 PollSeconds = clamped.PollSeconds,
                 CacheSeconds = clamped.CacheSeconds,
