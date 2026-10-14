@@ -7,7 +7,8 @@ namespace Jellyfin.Plugin.JellyPortal.Portal;
 /// Immutable on purpose: a reading is cached under the settings it was made with, so a changed
 /// address or key is recognised by comparing two of these.
 /// </summary>
-/// <param name="PortalUrl">The portal's address, trimmed. May be empty.</param>
+/// <param name="PortalUrl">The address the plugin asks the portal with, trimmed. May be empty. Never leaves the server.</param>
+/// <param name="PublicUrl">The address of the panel's link, trimmed. May be empty (no link). The only portal address a browser ever receives.</param>
 /// <param name="ApiKey">The portal's display-device API key. Never leaves the server.</param>
 /// <param name="PollSeconds">How often a browser asks for the summary.</param>
 /// <param name="CacheSeconds">How long a reading of the portal is reused.</param>
@@ -16,6 +17,7 @@ namespace Jellyfin.Plugin.JellyPortal.Portal;
 /// <param name="AdminsOnly">Whether only administrators see the icon.</param>
 public sealed record JellyPortalSettings(
     string PortalUrl,
+    string PublicUrl,
     string ApiKey,
     int PollSeconds,
     int CacheSeconds,
@@ -43,7 +45,8 @@ public sealed record JellyPortalSettings(
     };
 
     /// <summary>Builds clamped settings from what the settings page stored.</summary>
-    /// <param name="portalUrl">The address as typed.</param>
+    /// <param name="portalUrl">The address the portal is asked with, as typed.</param>
+    /// <param name="publicUrl">The address of the panel's link, as typed.</param>
     /// <param name="apiKey">The key as typed.</param>
     /// <param name="pollSeconds">Polling interval.</param>
     /// <param name="cacheSeconds">Cache lifetime.</param>
@@ -53,6 +56,7 @@ public sealed record JellyPortalSettings(
     /// <returns>Settings with every number inside its range.</returns>
     public static JellyPortalSettings From(
         string? portalUrl,
+        string? publicUrl,
         string? apiKey,
         int pollSeconds,
         int cacheSeconds,
@@ -60,6 +64,7 @@ public sealed record JellyPortalSettings(
         string? priorityServices,
         bool adminsOnly) => new(
             (portalUrl ?? string.Empty).Trim(),
+            (publicUrl ?? string.Empty).Trim(),
             (apiKey ?? string.Empty).Trim(),
             Math.Clamp(pollSeconds, PollRange.Min, PollRange.Max),
             Math.Clamp(cacheSeconds, CacheRange.Min, CacheRange.Max),

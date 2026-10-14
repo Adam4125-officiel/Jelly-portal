@@ -58,14 +58,18 @@ internal static class Settings
 {
     public const string Url = "http://portal.example:5000";
 
+    /// <summary>The address people are sent to: deliberately not the one the portal is asked with.</summary>
+    public const string PublicUrl = "https://status.example.com";
+
     public static JellyPortalSettings Configured(
         int cacheSeconds = 30,
         string url = Url,
+        string publicUrl = PublicUrl,
         string key = "k-secret",
         int soonHours = 24,
         string priority = "",
         bool adminsOnly = false) =>
-        JellyPortalSettings.From(url, key, 60, cacheSeconds, soonHours, priority, adminsOnly);
+        JellyPortalSettings.From(url, publicUrl, key, 60, cacheSeconds, soonHours, priority, adminsOnly);
 
     public static PortalReading Reading(PortalSnapshot snapshot, DateTimeOffset at) => new(ParseOutcome.Ok(snapshot), at);
 

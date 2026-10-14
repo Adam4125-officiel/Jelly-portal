@@ -55,6 +55,9 @@ public class PluginConfigurationTests
         Assert.True(new PluginConfiguration { PortalUrl = "  http://p:5000 ", ApiKey = " k " }.ToSettings().IsConfigured);
         Assert.Equal("http://p:5000", new PluginConfiguration { PortalUrl = "  http://p:5000 " }.ToSettings().PortalUrl);
         Assert.False(new PluginConfiguration { PortalUrl = "http://p:5000" }.ToSettings().IsConfigured);
+        // The link's address has no say in whether the plugin can ask the portal.
+        Assert.False(new PluginConfiguration { PublicUrl = "https://status.example.com", ApiKey = "k" }.ToSettings().IsConfigured);
+        Assert.Equal("https://status.example.com", new PluginConfiguration { PublicUrl = "  https://status.example.com " }.ToSettings().PublicUrl);
         Assert.False(new PluginConfiguration { ApiKey = "k" }.ToSettings().IsConfigured);
     }
 

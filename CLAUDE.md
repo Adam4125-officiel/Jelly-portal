@@ -209,6 +209,13 @@ and `player.py`, which plays a real clip: it makes a short VP9 file and a throw-
    days); priority services (by name, one per line, case-insensitive); visibility (all users / admins
    only). Without a URL or key the state is `unknown` with `reason: not_configured`, and the config
    page says what is wrong in words.
+   **There are two portal addresses and they must never be confused** (owner's request, 2026-10-14): `portalUrl` is
+   what the server asks the portal with (often private, e.g. a LAN address), `publicUrl` is optional and is the only
+   address a browser ever receives, as `portal.url` of the summary, where it is the link "Ouvrir le status portal". A
+   blank `publicUrl` is `portal.url: null` and the bubble has no link: **never fall back to `portalUrl`**. Before this
+   the summary carried the API address to every signed-in user (rc.1 did), which is why `SummaryCalculator` only takes
+   the public one and why `SummaryServiceTests` asserts that the private address is in no JSON in any state. Both go
+   through the same validation (`PortalClient.TryBuildUri`: http(s), a host, no credentials, no parameters).
    **The settings page (`Configuration/configPage.html`, in French, reachable from the dashboard sidebar and
    from Plugins) talks only to this plugin's own endpoints**, all admin-only (`RequiresElevation`):
    `GET/POST /JellyPortal/Config` and `POST /JellyPortal/Config/Test`. It must never use Jellyfin's generic

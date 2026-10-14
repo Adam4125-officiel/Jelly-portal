@@ -58,9 +58,12 @@ public sealed class PortalInfoDto
     [JsonPropertyName("name")]
     public string Name { get; init; } = string.Empty;
 
-    /// <summary>Gets the address to open from the panel.</summary>
+    /// <summary>
+    /// Gets the address to open from the panel: the administrator's public address, or null when there is none (no
+    /// link). Never the address the portal is asked with, which can be a private one.
+    /// </summary>
     [JsonPropertyName("url")]
-    public string Url { get; init; } = string.Empty;
+    public string? Url { get; init; }
 
     /// <summary>Gets when the portal was last read successfully, or null.</summary>
     [JsonPropertyName("fetchedAt")]

@@ -41,12 +41,17 @@ Dashboard > Plugins > **Jelly Portal** (also in the dashboard sidebar). Changes 
 | Setting | Default |
 |---|---|
 | Portal address, as the Jellyfin server reaches it (`http://192.168.1.10:5000`) | none |
+| Public address of the portal, the one the bubble's "open the status portal" link points to (`https://status.example.com`). Optional | none: no link |
 | Key of the portal's **Display device** API (portal administration, page *Display device*) | none |
 | Visible to | all users / administrators only |
 | Priority services (one name per line): their maintenance and incidents are put forward in the bubble | none |
 | "Maintenance coming up" window (1 h to 30 days) | 24 h |
 | Browser refresh interval (10 s to 1 h) | 60 s |
 | Server cache lifetime (5 s to 10 min): however many browsers are open, the portal is asked once per lifetime | 30 s |
+
+The two addresses are separate on purpose. The first one is what the Jellyfin *server* uses to reach the portal and is
+often a private address; it never leaves the server, and no browser ever receives it. The second is what your users
+open: leave it blank and the bubble simply has no link.
 
 The key stays on the server: it is never sent to a browser, and it is not shown again once saved (leave the field
 blank to keep it). **Test the connection** tries the address and key as typed, before saving, and says in words what

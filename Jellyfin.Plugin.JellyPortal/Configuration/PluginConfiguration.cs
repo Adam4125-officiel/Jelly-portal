@@ -14,6 +14,14 @@ public class PluginConfiguration : BasePluginConfiguration
     public string PortalUrl { get; set; } = string.Empty;
 
     /// <summary>
+    /// Gets or sets the address people are sent to by the panel's "open the status portal" link, for example
+    /// https://status.example.com. Optional, and not the address the plugin asks the portal with: that one is often
+    /// a private address (a machine on the local network) that nobody else can reach and that is nobody's business.
+    /// Blank means the panel has no link.
+    /// </summary>
+    public string PublicUrl { get; set; } = string.Empty;
+
+    /// <summary>
     /// Gets or sets the portal's display-device API key. <see cref="JsonIgnoreAttribute"/> keeps it out of
     /// every JSON answer, including Jellyfin's own GET /Plugins/{id}/Configuration, while the XML store
     /// (which ignores that attribute) still keeps it. The settings page therefore never receives it, and
@@ -40,5 +48,5 @@ public class PluginConfiguration : BasePluginConfiguration
     /// <summary>Returns the validated, clamped settings.</summary>
     /// <returns>The settings.</returns>
     public JellyPortalSettings ToSettings() => JellyPortalSettings.From(
-        PortalUrl, ApiKey, PollSeconds, CacheSeconds, SoonWindowHours, PriorityServices, AdminsOnly);
+        PortalUrl, PublicUrl, ApiKey, PollSeconds, CacheSeconds, SoonWindowHours, PriorityServices, AdminsOnly);
 }
