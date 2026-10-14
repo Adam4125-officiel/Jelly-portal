@@ -122,6 +122,7 @@ with sync_playwright() as p:
     page.click("#jpForm button[type=submit]")
     page.wait_for_function("() => document.querySelector('#jpSaveResult').textContent.includes('Enregistr')", timeout=20000)
     page.reload(wait_until="domcontentloaded")
+    page.wait_for_selector("#jpPortalUrl")
     page.wait_for_function("() => document.querySelector('#jpPortalUrl').value.length > 0", timeout=15000)
     check(page.input_value("#jpPublicUrl") == "", "a blank public address is saved as blank (no link)")
     page.fill("#jpPublicUrl", PUBLIC)
