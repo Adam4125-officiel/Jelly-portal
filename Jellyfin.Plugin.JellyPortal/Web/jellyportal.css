@@ -24,10 +24,23 @@
     transition: background-color 150ms, color 150ms;
 }
 
-/* The legacy header gives its buttons a 41px box and its own look: keep the same size and add nothing else. */
-.skinHeader .jellyportal-btn {
+/*
+ * The legacy header gives its buttons a 41px box and its own look: keep the same size and add nothing else. Keyed on the
+ * layout the icon was built for, not on .skinHeader: the modern playback header carries that class too, and its
+ * buttons are the modern size.
+ */
+.jellyportal-btn[data-jellyportal-icon="legacy"] {
     width: 41px;
     height: 41px;
+}
+
+/*
+ * On the playback page the legacy header carries the class osdHeader, and jellyfin-web hides every header button in it
+ * except back, cast and SyncPlay (".osdHeader .headerButton:not(...)", five classes of specificity), which is exactly
+ * how the icon went missing during playback. Only !important beats that without copying the selector.
+ */
+.osdHeader .jellyportal-btn {
+    display: inline-flex !important;
 }
 
 .jellyportal-btn:hover,

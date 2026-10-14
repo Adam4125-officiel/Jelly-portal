@@ -182,6 +182,9 @@
         };
     }
 
+    /** True on jellyfin-web's playback page (`#/video`), where the header is the player's own and fades out by itself. */
+    function isPlayerRoute(hash) { return /^#\/?video(?:[?\/]|$)/.test(String(hash || '')); }
+
     // ------------------------------------------------------------------------------------------------------
     // Exports for the node tests (and nothing else happens when loaded as a module)
     // ------------------------------------------------------------------------------------------------------
@@ -189,7 +192,7 @@
     var pure = {
         parseUtc: parseUtc, clockSkew: clockSkew, pollDelayMs: pollDelayMs, duration: duration, inFuture: inFuture,
         sinceAgo: sinceAgo, endsIn: endsIn, formatWhen: formatWhen, formatUntil: formatUntil, stateTitle: stateTitle, reasonText: reasonText,
-        statusLabel: statusLabel, incidentLabel: incidentLabel, safePortalUrl: safePortalUrl, placeBubble: placeBubble,
+        statusLabel: statusLabel, incidentLabel: incidentLabel, safePortalUrl: safePortalUrl, placeBubble: placeBubble, isPlayerRoute: isPlayerRoute,
         REASONS: Object.keys(REASON_TEXTS), STATES: Object.keys(STATE_TITLES)
     };
     if (typeof module !== 'undefined' && module.exports) {
@@ -275,6 +278,21 @@
 
     function visible(node) { return !!node && node.getClientRects().length > 0; }
 
+    /**
+     * The legacy playback header, while the player has faded it out: jellyfin-web gives it the class `hide`
+     * (display: none) a moment after the fade, and takes it away when the controls come back. That is the player's
+     * doing and not the end of the header, so the icon must stay where it is (and an open bubble with it). Only
+     * ever true without a modern app bar: the legacy header also exists, hidden for good, in the Modern layout.
+     */
+    function hiddenByThePlayer(headerRight) {
+        return !document.querySelector('.MuiAppBar-root') && !!headerRight.closest('.skinHeader.osdHeader');
+    }
+
+    /** Something the viewer presses on purpose (a button, a link, a slider), as opposed to the picture or the background. */
+    function isControl(node) {
+        return !!(node && node.closest && node.closest('button, a, input, select, textarea, [role="button"], [role="slider"], [role="menuitem"], .headerButton, .paper-icon-button-light, .sliderContainer'));
+    }
+
     function firstOther(parent) {
         var child = parent.firstElementChild;
         while (child && child.hasAttribute('data-jellyportal-icon')) { child = child.nextElementSibling; }
@@ -284,7 +302,8 @@
     /**
      * Modern layout: the app bar's toolbar is [left stack][box of buttons][box with the user menu]; the icon is the
      * first of the buttons, found from the user menu's avatar (labels are translated, the structure is not).
-     * Legacy layout: .skinHeader .headerRight holds the header buttons.
+     * Modern layout on the playback page: the buttons box of the player's own toolbar (see below).
+     * Legacy layout: .skinHeader .headerRight holds the header buttons (on the playback page too).
      * `before` is the element the icon must sit right before (null: last in its parent).
      */
     function findAnchor() {
@@ -299,8 +318,17 @@
                 return { layout: 'modern', parent: userBox.parentElement, before: userBox };
             }
         }
+        // Modern layout, playback page: jellyfin-web draws a header of its own there (a toolbar with the back button, the
+        // title and the cast and SyncPlay buttons) and no user menu, so there is no avatar to find the buttons from.
+        var player = document.querySelector('.osdHeader .videoOsd-appBar');
+        if (player && visible(player)) {
+            var playerButtons = player.lastElementChild;
+            if (playerButtons && playerButtons.classList.contains('MuiBox-root')) {
+                return { layout: 'modern', parent: playerButtons, before: firstOther(playerButtons) };
+            }
+        }
         var right = document.querySelector('.skinHeader .headerRight');
-        if (right && visible(right)) {
+        if (right && (visible(right) || hiddenByThePlayer(right))) {
             return { layout: 'legacy', parent: right, before: firstOther(right) };
         }
         return null;
@@ -525,7 +553,8 @@
     }
 
     function positionBubble() {
-        if (!bubble || !icon) { return; }
+        // An icon in a header the player has hidden (display: none) has no box: keep the bubble where it was.
+        if (!bubble || !icon || !icon.getClientRects().length) { return; }
         var rect = icon.getBoundingClientRect();
         var place = placeBubble(rect, { width: root.innerWidth, height: root.innerHeight });
         bubble.style.left = place.left + 'px';
@@ -623,15 +652,23 @@
     function start() {
         // Any click or touch outside the bubble and the icon closes it, which is also how another popover of the
         // header (user menu, cast, ...) takes over: opening one is a click outside the other.
-        document.addEventListener('pointerdown', function (event) {
+        // On the playback page jellyfin-web reacts to the *pointerdown* on the picture (a click pauses, a touch shows
+        // or hides the controls), so a press that only closes the bubble must not reach it: it is stopped here, on the
+        // window and in the capture phase, unless it lands on a control (which should still work).
+        root.addEventListener('pointerdown', function (event) {
             if (!model.open) { return; }
             var target = event.target;
             if ((bubble && bubble.contains(target)) || (icon && icon.contains(target))) { return; }
             closeBubble();
+            if (isPlayerRoute(root.location.hash) && !isControl(target)) { event.stopImmediatePropagation(); }
         }, true);
-        document.addEventListener('keydown', function (event) {
+        // Closing the bubble is all Escape does: on the playback page jellyfin-web's own handler would also hide the
+        // player's controls, and it cannot know the bubble was what the press was for. This listener is on the window,
+        // in the capture phase, so it runs before jellyfin-web's.
+        root.addEventListener('keydown', function (event) {
             if (event.key === 'Escape' && model.open) {
-                event.stopPropagation();
+                event.stopImmediatePropagation();
+                event.preventDefault();
                 var button = icon;
                 closeBubble();
                 if (button) { button.focus(); }
