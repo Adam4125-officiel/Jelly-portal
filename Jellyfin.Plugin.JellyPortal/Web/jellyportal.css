@@ -1,1 +1,293 @@
-/* Placeholder: the bubble and the icon styles replace this file. */
+/*
+ * Jelly Portal: the header icon and its bubble.
+ * Colours and sizes come from Jellyfin's own theme variables (--jf-*) with a fallback for each, so the icon
+ * follows the theme and still looks right if a variable is ever renamed.
+ */
+
+.jellyportal-btn {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    box-sizing: border-box;
+    width: 46px;
+    height: 46px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: background-color 150ms, color 150ms;
+}
+
+/* The legacy header gives its buttons a 41px box and its own look: keep the same size and add nothing else. */
+.skinHeader .jellyportal-btn {
+    width: 41px;
+    height: 41px;
+}
+
+.jellyportal-btn:hover,
+.jellyportal-btn[aria-expanded="true"] {
+    background-color: var(--jf-palette-action-hover, rgba(255, 255, 255, 0.08));
+}
+
+.jellyportal-btn:focus-visible {
+    outline: 2px solid var(--jf-palette-primary-main, #00a4dc);
+    outline-offset: -2px;
+}
+
+.jellyportal-btn > svg {
+    display: block;
+}
+
+/* Before the first answer: the place is kept, nothing is shown. */
+.jellyportal-btn[data-state="loading"] { visibility: hidden; }
+
+/* One state at a time. OK and "maintenance soon" keep the colour of the other header icons.
+   The coloured states are !important on purpose: the legacy header recolours a focused or pressed button with its own
+   accent, which would turn a red icon blue the moment it is clicked, exactly when someone is reading the bubble. */
+.jellyportal-btn[data-state="down"],
+.jellyportal-btn[data-state="down"]:hover,
+.jellyportal-btn[data-state="down"]:focus,
+.jellyportal-btn[data-state="down"]:active { color: var(--jf-palette-error-light, #e57373) !important; }
+.jellyportal-btn[data-state="degraded"],
+.jellyportal-btn[data-state="degraded"]:hover,
+.jellyportal-btn[data-state="degraded"]:focus,
+.jellyportal-btn[data-state="degraded"]:active { color: var(--jf-palette-warning-main, #ffa726) !important; }
+.jellyportal-btn[data-state="maintenance_ongoing"],
+.jellyportal-btn[data-state="maintenance_ongoing"]:hover,
+.jellyportal-btn[data-state="maintenance_ongoing"]:focus,
+.jellyportal-btn[data-state="maintenance_ongoing"]:active { color: var(--jellyportal-violet, #b388ff) !important; }
+.jellyportal-btn[data-state="unknown"],
+.jellyportal-btn[data-state="unknown"]:hover,
+.jellyportal-btn[data-state="unknown"]:focus,
+.jellyportal-btn[data-state="unknown"]:active { color: var(--jf-palette-text-disabled, rgba(255, 255, 255, 0.5)) !important; }
+
+/* A maintenance in progress is meant to catch the eye: a slow, soft pulse. */
+.jellyportal-btn[data-state="maintenance_ongoing"] > svg {
+    animation: jellyportal-pulse 2.6s ease-in-out infinite;
+}
+
+@keyframes jellyportal-pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.92); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .jellyportal-btn[data-state="maintenance_ongoing"] > svg { animation: none; }
+}
+
+/* The clock badge: a planned maintenance falls inside the configured window. */
+.jellyportal-badge {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 15px;
+    height: 15px;
+    border-radius: 50%;
+    background: var(--jf-palette-primary-main, #00a4dc);
+    color: var(--jf-palette-primary-contrastText, rgba(0, 0, 0, 0.87));
+    box-shadow: 0 0 0 2px var(--jf-palette-background-default, #101010);
+}
+
+.jellyportal-badge[hidden] { display: none; }
+
+/* ---- the bubble ------------------------------------------------------------------------------------- */
+
+.jellyportal-bubble {
+    position: fixed;
+    z-index: var(--jf-zIndex-drawer, 1200);   /* above the app bar (1100), below menus and dialogs (1300) */
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--jf-palette-divider, rgba(255, 255, 255, 0.12));
+    border-radius: calc(var(--jf-shape-borderRadius, 4px) * 2);
+    background: var(--jf-palette-background-paper, #202020);
+    color: var(--jf-palette-text-primary, #fff);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55);
+    font-size: 14px;
+    line-height: 1.4;
+    text-align: left;
+}
+
+.jellyportal-arrow {
+    position: absolute;
+    top: -7px;
+    width: 12px;
+    height: 12px;
+    margin-left: -6px;
+    border-top: 1px solid var(--jf-palette-divider, rgba(255, 255, 255, 0.12));
+    border-left: 1px solid var(--jf-palette-divider, rgba(255, 255, 255, 0.12));
+    background: var(--jf-palette-background-paper, #202020);
+    transform: rotate(45deg);
+}
+
+.jellyportal-scroll {
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    border-radius: inherit;
+}
+
+.jellyportal-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 16px 10px;
+    font-weight: 600;
+}
+
+.jellyportal-pill {
+    display: inline-flex;
+    flex: 0 0 auto;
+}
+
+.jellyportal-pill[data-state="down"] { color: var(--jf-palette-error-light, #e57373); }
+.jellyportal-pill[data-state="degraded"] { color: var(--jf-palette-warning-main, #ffa726); }
+.jellyportal-pill[data-state="maintenance_ongoing"] { color: var(--jellyportal-violet, #b388ff); }
+.jellyportal-pill[data-state="unknown"] { color: var(--jf-palette-text-disabled, rgba(255, 255, 255, 0.5)); }
+.jellyportal-pill[data-state="ok"] { color: var(--jf-palette-success-main, #66bb6a); }
+
+.jellyportal-notice {
+    padding: 4px 16px 14px;
+    color: var(--jf-palette-text-secondary, rgba(255, 255, 255, 0.7));
+}
+
+.jellyportal-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px 4px;
+    border-top: 1px solid var(--jf-palette-divider, rgba(255, 255, 255, 0.12));
+    color: var(--jf-palette-text-secondary, rgba(255, 255, 255, 0.7));
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.jellyportal-head + .jellyportal-heading { border-top: 0; }
+
+.jellyportal-count { font-weight: 400; }
+
+.jellyportal-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 5px 16px;
+}
+
+.jellyportal-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.jellyportal-status {
+    flex: 0 0 auto;
+    color: var(--jf-palette-text-secondary, rgba(255, 255, 255, 0.7));
+    font-size: 12px;
+}
+
+.jellyportal-dot {
+    flex: 0 0 auto;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--jf-palette-text-disabled, rgba(255, 255, 255, 0.5));
+}
+
+.jellyportal-dot[data-status="operational"] { background: var(--jf-palette-success-main, #66bb6a); }
+.jellyportal-dot[data-status="slow"] { background: var(--jf-palette-info-main, #29b6f6); }
+.jellyportal-dot[data-status="degraded"] { background: var(--jf-palette-warning-main, #ffa726); }
+.jellyportal-dot[data-status="maintenance"] { background: var(--jellyportal-violet, #b388ff); }
+.jellyportal-dot[data-status="down"] { background: var(--jf-palette-error-light, #e57373); }
+
+.jellyportal-item {
+    padding: 6px 16px 8px;
+    border-left: 3px solid transparent;
+}
+
+.jellyportal-priority {
+    border-left-color: var(--jf-palette-primary-main, #00a4dc);
+    background: var(--jf-palette-action-hover, rgba(255, 255, 255, 0.08));
+}
+
+.jellyportal-title {
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+
+.jellyportal-meta,
+.jellyportal-text {
+    margin-top: 2px;
+    color: var(--jf-palette-text-secondary, rgba(255, 255, 255, 0.7));
+    font-size: 13px;
+    overflow-wrap: anywhere;
+}
+
+.jellyportal-text { color: var(--jf-palette-text-primary, #fff); opacity: 0.85; }
+
+.jellyportal-tag {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 0 6px;
+    border-radius: 999px;
+    background: var(--jf-palette-primary-main, #00a4dc);
+    color: var(--jf-palette-primary-contrastText, rgba(0, 0, 0, 0.87));
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 18px;
+    vertical-align: middle;
+}
+
+.jellyportal-announcement { border-left-color: var(--jf-palette-info-main, #29b6f6); }
+.jellyportal-announcement[data-type="warning"] { border-left-color: var(--jf-palette-warning-main, #ffa726); }
+.jellyportal-announcement[data-type="critical"] { border-left-color: var(--jf-palette-error-light, #e57373); }
+.jellyportal-announcement[data-type="success"] { border-left-color: var(--jf-palette-success-main, #66bb6a); }
+
+.jellyportal-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 16px 14px;
+    border-top: 1px solid var(--jf-palette-divider, rgba(255, 255, 255, 0.12));
+    font-size: 13px;
+}
+
+.jellyportal-link {
+    color: var(--jf-palette-primary-light, #33b6e3);
+    text-decoration: none;
+}
+
+.jellyportal-link:hover,
+.jellyportal-link:focus-visible { text-decoration: underline; }
+
+.jellyportal-updated { color: var(--jf-palette-text-secondary, rgba(255, 255, 255, 0.7)); font-size: 12px; }
+
+.jellyportal-fold {
+    display: block;
+    box-sizing: border-box;
+    width: 100%;
+    margin: 0;
+    padding: 6px 16px;
+    border: 0;
+    background: transparent;
+    color: var(--jf-palette-primary-light, #33b6e3);
+    font: inherit;
+    font-size: 13px;
+    text-align: left;
+    cursor: pointer;
+}
+
+.jellyportal-fold:hover,
+.jellyportal-fold:focus-visible { text-decoration: underline; }
