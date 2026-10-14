@@ -406,45 +406,40 @@ Working rules that follow:
 - The release workflow is read from the tagged commit, so a fix to `release.yml` only takes effect
   from the next tag.
 
-## Handoff: where the work stands and where to pick it up (written 2026-10-14, ~03:00 CEST)
+## Handoff: where the work stands and where to pick it up (written 2026-10-14, evening)
 
 Read the rest of this file first; this section is only the state of play. The owner talks French; this repo is English.
 
-**On `main` (merged, CI green):** PR #1 (stable = `X.Y.Z.100`, violet maintenance), #2 (pure `Summary/` logic), #3 (portal
-client, cache, `GET /JellyPortal/Summary`, strict fake portal, dev loop), #4 (File Transformation injection), #5 (settings page).
-`v0.0.1-rc.1` (= Jellyfin `0.0.1.1`) was released and installed from the unstable URL on the dev Jellyfin as the release test.
+**Released:** `v0.0.1-rc.1` (empty plugin, the release test), `v0.1.0-rc.1` (the client itself) and **`v0.1.0-rc.2` (Jellyfin
+`0.1.0.2`)**, which adds the icon in the playback header, the separate public address for the bubble's link, and English/French
+with a Language setting (English by default). All PRs (#1-#9) are merged; `main` is the rc.2 commit plus docs. The owner installs
+through the unstable repository on his own Jellyfin, which updates the plugin by itself. **There is no stable `v0.1.0` yet and
+Claude never creates one**: when the owner has validated an RC he tags `v0.1.0` on that RC's commit.
 
-**This PR (#6, branch `feat/client-icon-bubble`): the client itself** (icon + bubble + polling), its Node tests
-(`client-tests/`), the browser end-to-end scripts (`dev/e2e/`) and the README images (`docs/images/`). It was verified live:
-`dev/e2e/bubble.py` **1644 checks, 0 failures** (16 scenarios x Modern/Legacy x desktop/phone: icon state and colour, pulse only
-for maintenance in progress, clock badge only for "soon", bubble geometry, URL unchanged, close by outside click / Escape / icon,
-text per scenario, incident order, no console error of ours, no grey flash before the first answer, colour kept while pressed),
-`dev/e2e/behaviour.py` **55 of 56** (the one failure was the Tokyo time-zone check, a flaw in the *test*: the fake portal moves a
-"two hours from now" start by a minute between two requests; fixed with a +-1 min tolerance and **not re-run**), 26 Node tests
-(daylight saving included), 330 C# tests, 22+13 Python tests. Seven+ mutations of each layer were shown to fail the suite.
-**Next action: `gh pr view 6`, wait for CI, then `gh pr ready 6 && gh pr merge 6 --merge --delete-branch`.**
+**The portal side is done:** Status Portal **`v1.12.0` is stable** (the owner asked for it on 2026-10-14; PR #29 merged, tag and
+release cut from that repository). The plugin needs >= 1.12.0 (`detail=full`).
 
-**Then, in order:**
-1. **The portal side is the owner's to merge**: `Adam4125-officiel/Status-Portal` **PR #29** (draft, branch `1.12.0`, `VERSION`
-   `1.12.0-rc.1`, adds the opt-in `detail=full` to `/api/device/summary`; default answer byte-identical, pinned by a golden test).
-   It was written by a Sonnet subagent and re-verified by me (full portal suite re-run: 1589 passed). **Do not merge it and do not
-   tag it**: the owner reviews, merges, tags the portal RC and updates his production through the portal's updater (unstable
-   channel). A local worktree `/home/adrrrr/Status-Portal-1.12.0` holds that branch (remove with `git worktree remove` once merged).
-2. **Only when the owner says the portal RC runs at his place**: point the plugin at the **real** portal and check it for real
-   (never done: everything so far ran against captured real answers and the fake). In the plugin's settings enter the portal address
-   and its Display device key, press "Tester la connexion", then compare the bubble with the portal's own page. Capture anything
-   that differs as a new fixture in `Jellyfin.Plugin.JellyPortal.Tests/Fixtures/` (re-capture from the real route, never by hand).
-3. **Cut `v0.1.0-rc.1`** (Jellyfin `0.1.0.1`) from `main` once #6 is merged: `git tag v0.1.0-rc.1 && git push origin v0.1.0-rc.1`
-   (Claude may push RC tags, never a stable one, and tags cannot be deleted or moved). Check the GitHub pre-release, the
-   `manifest-unstable.json` entry (MD5 = the zip served at `sourceUrl`), and an install from the catalog on the dev Jellyfin
-   (add the unstable repository on purpose and remove the local dev build: see the auto-update trap in *Dev loop*).
-4. **Final report to the owner**: what works, what was tested and what was not, known limits, and the Playwright screenshots
-   (`./screenshots/` is gitignored; regenerate with `dev/e2e/bubble.py` and `dev/e2e/contact_sheet.py`, Read the PNGs to show them).
+**Next, in order:**
+1. **The owner tests rc.2 on his production and reports.** What to say to him when he reports a bug: ask for the `[JellyPortal]`
+   lines of the Jellyfin log and the exact text of "Test the connection". A fix is the next RC (`rc.3`), never a moved tag.
+2. After an upgrade from rc.1 the interface is English until the Language setting is changed, and the bubble has **no link** until
+   a public address is entered (rc.1 linked to the address the plugin asks the portal with, and sent it to every signed-in user,
+   which is why that address no longer reaches a browser at all). Say so if he is surprised.
+3. Anything new is proposed to the owner first.
 
-**Known limits / not verified (say so in the report):** the real portal 1.12.0 and the owner's production Jellyfin were never
-contacted; Jellyfin Desktop and the Android app were not tried (only a desktop Chromium, at 1280 and 390 px); a hidden tab is
-simulated by overriding `document.hidden`; the Legacy layout was driven as `desktop-legacy`/`mobile-legacy` through
-`localStorage.layout`; `v0.0.1-rc.1` predates all of the plugin's real features.
+**Verified on the rc.2 artifact itself (installed from the unstable catalog on the Dockerised Jellyfin 12.2, not a local build):**
+`bubble.py` 1644 checks, 0 failures **in English and again in French** (16 scenarios x Modern/Legacy x desktop/phone), `behaviour.py`
+72/0, `player.py` 128/0, and against **his real portal 1.12.0** the settings page's "Test the connection", the summary and the
+bubble in both languages and the four layouts (his portal was healthy at the time, so only the OK state and one `slow` service were
+seen with real data). No answer of the plugin to a non-administrator contains the private address or the key (403 on the
+configuration endpoints, checked). Earlier: 358 C# tests, 36 Node tests, `config_page.py` 43/0 per language.
+
+**Known limits / not verified (say so in any report):** Jellyfin Desktop, the Android app, a real touch device and the TV layout were
+never tried (only a desktop Chromium at 1280 and 390 px; a hidden tab is simulated by overriding `document.hidden`; Legacy is
+driven as `desktop-legacy`/`mobile-legacy` through `localStorage.layout`); fullscreen over the player was not run; **the English
+wording was written by the model and not reviewed by a native reader**; incidents and maintenance were never seen with real data
+(nothing is created in the owner's portal for a test); when the player fades its controls an open bubble stays open and its arrow
+points at the (invisible) icon, a deliberate choice that the owner may want to change.
 
 **To resume a session on the dev VM** (state lives in `dev/data/`, gitignored; Docker container `jellyportal-dev`, stopped when idle):
 ```
@@ -452,13 +447,18 @@ export PATH=$HOME/.dotnet:$HOME/.local/node/bin:$PATH
 dev/dev.sh --no-logs                                   # build, package like a release, install, restart Jellyfin 12.2
 python3 dev/jf.py configure --cache 5 --poll 10        # then restart: the e2e scripts expect a 5 s cache and a 10 s poll
 (nohup python3 dev/fake_portal.py --host 172.17.0.1 --port 8099 > dev/data/fake-portal.log 2>&1 &)
-dev/data/venv/bin/python -u dev/e2e/bubble.py          # ~12 min; or name scenarios; never run two e2e at once (shared server)
-dev/data/venv/bin/python -u dev/e2e/behaviour.py       # ~6 min
+JP_LANG=en dev/data/venv/bin/python -u dev/e2e/bubble.py     # ~4 min; JP_LANG=fr for the French run; never two e2e at once
+dev/data/venv/bin/python -u dev/e2e/behaviour.py             # ~5 min
+dev/data/venv/bin/python -u dev/e2e/player.py                # ~3 min, plays a real clip it makes itself
 dotnet test Jellyfin.Plugin.JellyPortal.sln; node --test client-tests/*.test.js; python3 -m unittest discover -s tools/tests; python3 -m unittest discover -s dev/tests
 ```
-Do not run `dev/dev.sh` while an e2e script is running (it stops the container). The Python e2e output is buffered unless `-u`.
-The dev admin and a `viewer` user are in `dev/data/dev-*.json` (random passwords, gitignored); the dev Jellyfin listens on
-127.0.0.1 only and its Jelly Portal repository must stay unconfigured (auto-update).
+**Read the logs of a run, not the exit code of a wrapper script**: `echo "... $(date) ... $?"` reports the status of `date`, and a
+crashed Python script looked like a pass once. Do not run `dev/dev.sh` while an e2e script runs (it restarts the container). To test a
+real release, **remove the local build first** (`rm -rf "dev/data/config/plugins/Jelly Portal_0.0.0.1"` with the container stopped)
+and add the unstable repository on purpose (`jf.py repos <File Transformation manifest> <unstable manifest>`), otherwise Jellyfin
+replaces or shadows it silently; to go back to local builds, remove the Jelly Portal repository again and the catalog build.
+The dev admin and a `viewer` user are in `dev/data/dev-*.json` (random passwords, gitignored); the dev Jellyfin listens on 127.0.0.1
+only. `player.py` creates a throw-away "Test" library and a VP9 clip under `dev/data/media/Test`.
 
 ## Project phases and gates
 
