@@ -11,7 +11,7 @@ import urllib.request
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from common import BASE, SHOTS, Recorder, chrome, login  # noqa: E402
+from common import BASE, LANGUAGE, SHOTS, Recorder, chrome, login, set_language  # noqa: E402
 from playwright.sync_api import sync_playwright  # noqa: E402
 
 FAKE = "http://172.17.0.1:8099"
@@ -25,24 +25,47 @@ EXPECTED = {
     "announcements": "ok", "busy": "down",
     "disabled": "unknown", "bad_key": "unknown", "outdated": "unknown", "bad_gateway": "unknown",
 }
-# fragments the open bubble must contain for a scenario
-TEXT = {
-    "ok": ["Tous les services fonctionnent", "Jellyfin", "Seerr", "Nextcloud"],   # nothing competes: the whole list is shown, not folded
-    "down": ["Au moins un service est hors service", "Nextcloud", "Hors service", "Incidents en cours", "Nextcloud is unreachable", "depuis"],
-    "degraded": ["Fonctionnement dégradé", "Sonarr", "Dégradé"],
-    "incident_only": ["Fonctionnement dégradé", "Incidents en cours", "Intermittent network errors", "Sous surveillance"],
-    "maintenance_ongoing": ["Maintenance en cours", "NAS disk replacement", "se termine dans", "Read-only while the array rebuilds."],
-    "manual_maintenance": ["Maintenance en cours", "Seerr", "En maintenance"],
-    "maintenance_soon": ["Maintenance prévue prochainement", "Maintenances à venir", "Jellyfin update", "dans 2 h", "aujourd’hui à"],
-    "maintenance_far": ["Maintenances à venir", "Router firmware", "dans 2 j"],
-    "announcements": ["Annonces", "Movie night", "Épinglée", "Heads up", "It worked!"],
-    "slow": ["Radarr", "Lent"],
-    "busy": ["Incidents en cours", "Maintenance en cours", "Maintenances à venir", "Annonces", "NAS disk replacement"],
-    "disabled": ["État indisponible", "désactivée"],
-    "bad_key": ["État indisponible", "refuse la clé API"],
-    "outdated": ["État indisponible", "1.12.0"],
-    "bad_gateway": ["État indisponible", "Impossible de joindre le status portal"],
+# fragments the open bubble must contain for a scenario, in the language of the run (JP_LANG, English by default)
+TEXTS = {
+    "en": {
+        "ok": ["All services are operational", "Jellyfin", "Seerr", "Nextcloud"],   # nothing competes: the whole list is shown, not folded
+        "down": ["At least one service is down", "Nextcloud", "Down", "Ongoing incidents", "Nextcloud is unreachable", "\u00b7 for "],
+        "degraded": ["Degraded performance", "Sonarr", "Degraded"],
+        "incident_only": ["Degraded performance", "Ongoing incidents", "Intermittent network errors", "Monitoring"],
+        "maintenance_ongoing": ["Maintenance in progress", "NAS disk replacement", "ends in", "Read-only while the array rebuilds."],
+        "manual_maintenance": ["Maintenance in progress", "Seerr", "Under maintenance"],
+        "maintenance_soon": ["Maintenance planned soon", "Upcoming maintenance", "Jellyfin update", "in 2 h", "today at"],
+        "maintenance_far": ["Upcoming maintenance", "Router firmware", "in 2 d"],
+        "announcements": ["Announcements", "Movie night", "Pinned", "Heads up", "It worked!"],
+        "slow": ["Radarr", "Slow"],
+        "busy": ["Ongoing incidents", "Maintenance in progress", "Upcoming maintenance", "Announcements", "NAS disk replacement"],
+        "disabled": ["Status unavailable", "switched off"],
+        "bad_key": ["Status unavailable", "refuses the configured API key"],
+        "outdated": ["Status unavailable", "1.12.0"],
+        "bad_gateway": ["Status unavailable", "The status portal cannot be reached"],
+    },
+    "fr": {
+        "ok": ["Tous les services fonctionnent", "Jellyfin", "Seerr", "Nextcloud"],
+        "down": ["Au moins un service est hors service", "Nextcloud", "Hors service", "Incidents en cours", "Nextcloud is unreachable", "depuis"],
+        "degraded": ["Fonctionnement d\u00e9grad\u00e9", "Sonarr", "D\u00e9grad\u00e9"],
+        "incident_only": ["Fonctionnement d\u00e9grad\u00e9", "Incidents en cours", "Intermittent network errors", "Sous surveillance"],
+        "maintenance_ongoing": ["Maintenance en cours", "NAS disk replacement", "se termine dans", "Read-only while the array rebuilds."],
+        "manual_maintenance": ["Maintenance en cours", "Seerr", "En maintenance"],
+        "maintenance_soon": ["Maintenance pr\u00e9vue prochainement", "Maintenances \u00e0 venir", "Jellyfin update", "dans 2 h", "aujourd\u2019hui \u00e0"],
+        "maintenance_far": ["Maintenances \u00e0 venir", "Router firmware", "dans 2 j"],
+        "announcements": ["Annonces", "Movie night", "\u00c9pingl\u00e9e", "Heads up", "It worked!"],
+        "slow": ["Radarr", "Lent"],
+        "busy": ["Incidents en cours", "Maintenance en cours", "Maintenances \u00e0 venir", "Annonces", "NAS disk replacement"],
+        "disabled": ["\u00c9tat indisponible", "d\u00e9sactiv\u00e9e"],
+        "bad_key": ["\u00c9tat indisponible", "refuse la cl\u00e9 API"],
+        "outdated": ["\u00c9tat indisponible", "1.12.0"],
+        "bad_gateway": ["\u00c9tat indisponible", "Impossible de joindre le status portal"],
+    },
 }
+TEXT = TEXTS[LANGUAGE]
+UNTIL = {"en": "until ", "fr": "jusqu\u2019\u00e0 "}[LANGUAGE]
+SAME_DAY = {"en": "until today", "fr": "jusqu\u2019\u00e0 aujourd\u2019hui"}[LANGUAGE]
+HEADINGS = {"en": ["Services", "Ongoing incidents"], "fr": ["Services", "Incidents en cours"]}[LANGUAGE]
 COMBOS = [  # (name, layout in localStorage, viewport)
     ("modern-desktop", "modern", {"width": 1280, "height": 800}),
     ("legacy-desktop", "desktop-legacy", {"width": 1280, "height": 800}),
@@ -153,10 +176,10 @@ def run_case(page, rec, combo, name, vw, vh, sc, folder):
     for fragment in TEXT.get(sc, []):
         check(fragment in body, f"{tag} the bubble says \"{fragment}\"")
     if sc == "maintenance_soon":
-        check("jusqu’à aujourd’hui" not in body and "jusqu’à " in body, f"{tag} the end of a same-day maintenance is just a time (\"jusqu’à 04:19\", not \"jusqu’à aujourd’hui à 04:19\")")
+        check(SAME_DAY not in body and UNTIL in body, f"{tag} the end of a same-day maintenance is just a time ({UNTIL.strip()} 04:19, not {SAME_DAY} at 04:19)")
     if sc in ("down", "busy"):
         order = page.evaluate("() => [...document.querySelectorAll('.jellyportal-heading > span:first-child')].map(e => e.textContent)")
-        check(order[:2] == ["Services", "Incidents en cours"], f"{tag} incidents come right after the services that are down ({order})")
+        check(order[:2] == HEADINGS, f"{tag} incidents come right after the services that are down ({order})")
     page.screenshot(path=str(folder / f"{sc}-open.png"))
 
     # --- close three ways, one bubble at a time
@@ -178,6 +201,8 @@ def run_case(page, rec, combo, name, vw, vh, sc, folder):
 
 
 wanted = sys.argv[1:] or list(EXPECTED)
+set_language()
+print(f"language of this run: {LANGUAGE}")
 with sync_playwright() as p:
     browser = p.chromium.launch(executable_path=chrome(), headless=True)
     contexts = {}
@@ -188,7 +213,7 @@ with sync_playwright() as p:
         rec = Recorder(page)
         scenario("ok")
         login(page)
-        folder = SHOTS / combo
+        folder = SHOTS / LANGUAGE / combo
         folder.mkdir(parents=True, exist_ok=True)
         contexts[combo] = (page, rec, viewport, folder)
     for sc in wanted:

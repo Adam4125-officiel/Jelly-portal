@@ -10,12 +10,27 @@ import glob
 import json
 import os
 import re
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 BASE = os.environ.get("JELLYPORTAL_DEV_URL", "http://127.0.0.1:8096")
 SHOTS = ROOT / "screenshots"
 PORTAL_KEY = "dev-key-0123456789abcdef0123456789abcdef0123456789ab"
+
+# The plugin's language for a run, en (the default) or fr: JP_LANG=fr dev/data/venv/bin/python dev/e2e/<script>.py
+# A script checks the wording in that language, and writes its screenshots under ./screenshots/<language>/.
+LANGUAGE = os.environ.get("JP_LANG", "en")
+if LANGUAGE not in ("en", "fr"):
+    raise SystemExit(f"JP_LANG must be en or fr, not {LANGUAGE!r}")
+
+
+def set_language(language: str = LANGUAGE) -> None:
+    """Puts the plugin in a language through its own settings endpoint, as the settings page does."""
+    sys.path.insert(0, str(ROOT / "dev"))
+    import jf
+    status, body = jf.call("POST", "/JellyPortal/Config", {"language": language}, jf.login())
+    assert status == 200 and body["language"] == language, (status, body)
 
 
 def chrome() -> str:

@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from common import SHOTS, chrome  # noqa: E402
+from common import LANGUAGE, SHOTS, chrome  # noqa: E402
 from playwright.sync_api import sync_playwright  # noqa: E402
 
 ORDER = ["ok", "slow", "down", "degraded", "incident_only", "maintenance_ongoing", "manual_maintenance", "maintenance_soon",
@@ -21,12 +21,12 @@ def build(kind, combo, names):
     if kind == "closed":
         crop_w = width if phone else 560
         for n in names:
-            src = (SHOTS / combo / f"{n}-closed.png").as_uri()
+            src = (SHOTS / LANGUAGE / combo / f"{n}-closed.png").as_uri()
             rows.append(f'<div class="cell"><div class="label">{n}</div><div class="box" style="width:{crop_w}px;height:62px"><img src="{src}" style="margin-left:-{width - crop_w}px"></div></div>')
         css = ".grid{display:grid;grid-template-columns:repeat(%d,auto);gap:6px 18px;padding:10px}" % (1 if phone else 2)
     else:
         for n in names:
-            src = (SHOTS / combo / f"{n}-open.png").as_uri()
+            src = (SHOTS / LANGUAGE / combo / f"{n}-open.png").as_uri()
             crop_w = width if phone else 640
             h = 844 if phone else 700
             rows.append(f'<div class="cell"><div class="label">{n}</div><div class="box" style="width:{crop_w}px;height:{h}px"><img src="{src}" style="margin-left:-{width - crop_w}px"></div></div>')
@@ -34,7 +34,7 @@ def build(kind, combo, names):
     html = f"""<html><body style="margin:0;background:#262626;font:12px sans-serif;color:#ddd"><style>{css}
     .label{{margin:2px 0;color:#9ad}} .box{{overflow:hidden;border:1px solid #444;background:#101010}} .box img{{display:block}}</style>
     <div class="grid">{''.join(rows)}</div></body></html>"""
-    page_file = SHOTS / f"_sheet-{kind}-{combo}.html"
+    page_file = SHOTS / f"_sheet-{LANGUAGE}-{kind}-{combo}.html"
     page_file.write_text(html)
     return page_file
 
@@ -47,7 +47,7 @@ with sync_playwright() as p:
     page = b.new_page(viewport={"width": 1400 if kind == "closed" else 1700, "height": 800})
     page.goto(html.as_uri())
     page.wait_for_timeout(500)
-    out = SHOTS / f"sheet-{kind}-{combo}.png"
+    out = SHOTS / f"sheet-{LANGUAGE}-{kind}-{combo}.png"
     page.screenshot(path=str(out), full_page=True)
     print(out)
     b.close()

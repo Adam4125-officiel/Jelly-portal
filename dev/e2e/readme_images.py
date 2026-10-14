@@ -8,15 +8,16 @@ import urllib.request
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from common import ROOT, Recorder, chrome, login  # noqa: E402
+from common import ROOT, Recorder, chrome, login, set_language  # noqa: E402
 from playwright.sync_api import sync_playwright  # noqa: E402
 
 OUT = ROOT / "docs" / "images"
 FAKE = "http://172.17.0.1:8099"
 STATES = [  # (scenario, caption)
-    ("ok", "Tout va bien"), ("maintenance_soon", "Maintenance prévue"), ("degraded", "Dégradé"),
-    ("maintenance_ongoing", "Maintenance en cours"), ("down", "Hors service"), ("bad_key", "Portal injoignable"),
+    ("ok", "All good"), ("maintenance_soon", "Maintenance planned"), ("degraded", "Degraded"),
+    ("maintenance_ongoing", "Maintenance in progress"), ("down", "Down"), ("bad_key", "Portal unreachable"),
 ]
+set_language("en")   # the README is in English, so are its pictures
 
 
 def scenario(name):
